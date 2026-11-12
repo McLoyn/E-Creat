@@ -1,0 +1,163 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+// Role: USER, ADMIN
+// ContentStatus: DRAFT, PUBLISHED, ARCHIVED
+// CategoryKind: SUBSECTOR, SUBAPP_TYPE
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  passwordHash String
+  role         String        @default("USER") // USER | ADMIN
+  isActive     Boolean       @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  profile      UserProfile?
+  sessions     AuthSession[]
+}
+
+model UserProfile {
+  id           String                @id @default(uuid())
+  userId       String                @unique
+  displayName  String
+  locationText String?
+  photoPath    String?
+  bio          String?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interests    UserProfileInterest[]
+}
+
+model UserProfileInterest {
+  userProfileId String
+  categoryId    String
+  createdAt     DateTime    @default(now())
+
+  profile       UserProfile @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+  category      Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@id([userProfileId, categoryId])
+}
+
+model AuthSession {
+  id                  String    @id @default(uuid())
+  userId              String
+  familyId            String
+  refreshTokenHash    String    @unique
+  expiresAt           DateTime
+  revokedAt           DateTime?
+  replacedBySessionId String?
+  userAgent           String?
+  createdAt           DateTime  @default(now())
+
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@index([expiresAt])
+}
+
+model Category {
+  id               String                    @id @default(uuid())
+  kind             String                    // SUBSECTOR | SUBAPP_TYPE
+  name             String
+  slug             String
+  description      String?
+  isActive         Boolean                   @default(true)
+  sortOrder        Int                       @default(0)
+  createdById      String?
+  updatedById      String?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  subApps          SubAppCategory[]
+  creativeProfiles CreativeProfileCategory[]
+  userInterests    UserProfileInterest[]
+
+  @@unique([kind, slug])
+  @@unique([kind, name])
+  @@index([kind, isActive, sortOrder])
+}
+
+model SubApp {
+  id          String           @id @default(uuid())
+  name        String
+  slug        String           @unique
+  tagline     String
+  description String
+  externalUrl String
+  imagePath   String?
+  status      String           @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
+  publishedAt DateTime?
+  archivedAt  DateTime?
+  createdById String?
+  updatedById String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  categories  SubAppCategory[]
+
+  @@index([status, publishedAt])
+  @@index([status, name])
+}
+
+model SubAppCategory {
+  subAppId   String
+  categoryId String
+
+  subApp     SubApp   @relation(fields: [subAppId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@id([subAppId, categoryId])
+  @@index([categoryId])
+}
+
+model CreativeProfile {
+  id              String                    @id @default(uuid())
+  name            String
+  slug            String                    @unique
+  summary         String
+  description     String
+  city            String
+  district        String?
+  imagePath       String?
+  websiteUrl      String?
+  instagramHandle String?
+  whatsappNumber  String?
+  status          String                    @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
+  publishedAt     DateTime?
+  archivedAt      DateTime?
+  createdById     String?
+  updatedById     String?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  categories      CreativeProfileCategory[]
+
+  @@index([status, publishedAt])
+  @@index([status, city])
+  @@index([status, district])
+}
+
+model CreativeProfileCategory {
+  creativeProfileId String
+  categoryId        String
+
+  creativeProfile   CreativeProfile @relation(fields: [creativeProfileId], references: [id], onDelete: Cascade)
+  category          Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@id([creativeProfileId, categoryId])
+  @@index([categoryId])
+}
