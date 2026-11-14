@@ -110,6 +110,95 @@ creativeProfilesRouter.get('/:slug', async (req: Request, res: Response, next: N
   }
 });
 
+// Public: GET /creative-profiles/:slug/works
+creativeProfilesRouter.get('/:slug/works', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { slug } = req.params;
+    const profile = await prisma.creativeProfile.findUnique({
+      where: { slug },
+      select: { id: true, status: true },
+    });
+
+    if (!profile || profile.status !== 'PUBLISHED') {
+      throw new AppError({ code: 'NOT_FOUND', message: 'Profil Pelaku Kreatif tidak ditemukan atau belum dipublikasikan.', status: 404 });
+    }
+
+    const works = await prisma.creativeWork.findMany({
+      where: { creativeProfileId: profile.id, status: 'PUBLISHED' },
+      orderBy: { publishedAt: 'desc' },
+      include: { category: true },
+    });
+
+    const formatted = works.map((w) => {
+      let images: string[] = [];
+      try { images = JSON.parse(w.imagePaths); } catch {}
+      return {
+        id: w.id,
+        title: w.title,
+        slug: w.slug,
+        description: w.description,
+        coverImage: images[0] || null,
+        images,
+        technique: w.technique,
+        motif: w.motif,
+        year: w.year,
+        publishedAt: w.publishedAt,
+        category: w.category,
+      };
+    });
+
+    return res.json({ data: formatted });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Public: GET /creative-profiles/:slug/products
+creativeProfilesRouter.get('/:slug/products', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { slug } = req.params;
+    const profile = await prisma.creativeProfile.findUnique({
+      where: { slug },
+      select: { id: true, status: true },
+    });
+
+    if (!profile || profile.status !== 'PUBLISHED') {
+      throw new AppError({ code: 'NOT_FOUND', message: 'Profil Pelaku Kreatif tidak ditemukan atau belum dipublikasikan.', status: 404 });
+    }
+
+    const products = await prisma.creativeProduct.findMany({
+      where: { creativeProfileId: profile.id, status: 'PUBLISHED' },
+      orderBy: { publishedAt: 'desc' },
+      include: { productType: true, work: true },
+    });
+
+    const formatted = products.map((p) => {
+      let images: string[] = [];
+      try { images = JSON.parse(p.imagePaths); } catch {}
+      return {
+        id: p.id,
+        title: p.title,
+        slug: p.slug,
+        description: p.description,
+        coverImage: images[0] || null,
+        images,
+        material: p.material,
+        dimensions: p.dimensions,
+        priceMin: p.priceMin,
+        priceMax: p.priceMax,
+        priceUnit: p.priceUnit,
+        availability: p.availability,
+        publishedAt: p.publishedAt,
+        productType: p.productType,
+      };
+    });
+
+    return res.json({ data: formatted });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Admin: GET /admin/creative-profiles
 adminCreativeProfilesRouter.get('/', requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -139,6 +228,14 @@ adminCreativeProfilesRouter.get('/', requireAdmin, async (req: Request, res: Res
         categories: {
           include: { category: true },
         },
+        owner: {
+          include: {
+            user: { select: { id: true, email: true, profile: true } },
+          },
+        },
+        _count: {
+          select: { works: true, products: true },
+        },
       },
     });
 
@@ -165,6 +262,14 @@ adminCreativeProfilesRouter.get('/:id', requireAdmin, async (req: Request, res: 
       include: {
         categories: {
           include: { category: true },
+        },
+        owner: {
+          include: {
+            user: { select: { id: true, email: true, profile: true } },
+          },
+        },
+        _count: {
+          select: { works: true, products: true },
         },
       },
     });

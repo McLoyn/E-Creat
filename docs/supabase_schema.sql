@@ -1,9 +1,9 @@
 -- ==============================================================================
--- Ekraf HUB V0.1 — Supabase / PostgreSQL Schema DDL
+-- Ekraf HUB V0.1 — Supabase / PostgreSQL Schema DDL (Additive W1: Showcase & Pasar)
 -- Compatible with Supabase SQL Editor and Prisma PostgreSQL
 -- ==============================================================================
 
--- Enums
+-- 1. Enums & Extensions
 DO $$ BEGIN
   CREATE TYPE "Role" AS ENUM ('USER', 'ADMIN');
 EXCEPTION
@@ -11,18 +11,24 @@ EXCEPTION
 END $$;
 
 DO $$ BEGIN
-  CREATE TYPE "ContentStatus" AS ENUM ('DRAFT', 'PUBLISHED', 'ARCHIVED');
+  CREATE TYPE "ContentStatus" AS ENUM ('DRAFT', 'PENDING_REVIEW', 'NEEDS_REVISION', 'REJECTED', 'PUBLISHED', 'ARCHIVED');
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
 
 DO $$ BEGIN
-  CREATE TYPE "CategoryKind" AS ENUM ('SUBSECTOR', 'SUBAPP_TYPE');
+  CREATE TYPE "CategoryKind" AS ENUM ('SUBSECTOR', 'SUBAPP_TYPE', 'WORK_CATEGORY', 'PRODUCT_TYPE');
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
 
--- 1. User
+DO $$ BEGIN
+  CREATE TYPE "ProductAvailability" AS ENUM ('AVAILABLE', 'MADE_TO_ORDER', 'UNAVAILABLE');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+
+-- 2. User & UserProfile
 CREATE TABLE IF NOT EXISTS "User" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "email" TEXT UNIQUE NOT NULL,
@@ -35,7 +41,6 @@ CREATE TABLE IF NOT EXISTS "User" (
   CONSTRAINT "chk_user_email_lowercase" CHECK ("email" = lower("email"))
 );
 
--- 2. UserProfile
 CREATE TABLE IF NOT EXISTS "UserProfile" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "userId" UUID UNIQUE NOT NULL REFERENCES "User"("id") ON DELETE CASCADE,
@@ -65,7 +70,6 @@ CREATE TABLE IF NOT EXISTS "Category" (
 );
 CREATE INDEX IF NOT EXISTS "idx_category_lookup" ON "Category"("kind", "isActive", "sortOrder");
 
--- 4. UserProfileInterest
 CREATE TABLE IF NOT EXISTS "UserProfileInterest" (
   "userProfileId" UUID NOT NULL REFERENCES "UserProfile"("id") ON DELETE CASCADE,
   "categoryId" UUID NOT NULL REFERENCES "Category"("id") ON DELETE RESTRICT,
@@ -73,7 +77,7 @@ CREATE TABLE IF NOT EXISTS "UserProfileInterest" (
   PRIMARY KEY ("userProfileId", "categoryId")
 );
 
--- 5. AuthSession
+-- 4. AuthSession
 CREATE TABLE IF NOT EXISTS "AuthSession" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "userId" UUID NOT NULL REFERENCES "User"("id") ON DELETE CASCADE,
@@ -89,7 +93,7 @@ CREATE INDEX IF NOT EXISTS "idx_session_user" ON "AuthSession"("userId");
 CREATE INDEX IF NOT EXISTS "idx_session_family" ON "AuthSession"("familyId");
 CREATE INDEX IF NOT EXISTS "idx_session_expires" ON "AuthSession"("expiresAt");
 
--- 6. SubApp
+-- 5. SubApp & SubAppCategory
 CREATE TABLE IF NOT EXISTS "SubApp" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "name" TEXT NOT NULL,
@@ -112,7 +116,6 @@ CREATE TABLE IF NOT EXISTS "SubApp" (
 CREATE INDEX IF NOT EXISTS "idx_subapp_status_published" ON "SubApp"("status", "publishedAt" DESC);
 CREATE INDEX IF NOT EXISTS "idx_subapp_status_name" ON "SubApp"("status", "name");
 
--- 7. SubAppCategory
 CREATE TABLE IF NOT EXISTS "SubAppCategory" (
   "subAppId" UUID NOT NULL REFERENCES "SubApp"("id") ON DELETE CASCADE,
   "categoryId" UUID NOT NULL REFERENCES "Category"("id") ON DELETE RESTRICT,
@@ -120,7 +123,7 @@ CREATE TABLE IF NOT EXISTS "SubAppCategory" (
 );
 CREATE INDEX IF NOT EXISTS "idx_subapp_category" ON "SubAppCategory"("categoryId");
 
--- 8. CreativeProfile (No FK to User or UserProfile as required)
+-- 6. CreativeProfile & CreativeProfileCategory
 CREATE TABLE IF NOT EXISTS "CreativeProfile" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "name" TEXT NOT NULL,
@@ -147,10 +150,86 @@ CREATE INDEX IF NOT EXISTS "idx_creative_status_published" ON "CreativeProfile"(
 CREATE INDEX IF NOT EXISTS "idx_creative_status_city" ON "CreativeProfile"("status", "city");
 CREATE INDEX IF NOT EXISTS "idx_creative_status_district" ON "CreativeProfile"("status", "district");
 
--- 9. CreativeProfileCategory
 CREATE TABLE IF NOT EXISTS "CreativeProfileCategory" (
   "creativeProfileId" UUID NOT NULL REFERENCES "CreativeProfile"("id") ON DELETE CASCADE,
   "categoryId" UUID NOT NULL REFERENCES "Category"("id") ON DELETE RESTRICT,
   PRIMARY KEY ("creativeProfileId", "categoryId")
 );
 CREATE INDEX IF NOT EXISTS "idx_creative_category" ON "CreativeProfileCategory"("categoryId");
+
+-- 7. K-01: CreativeProfileOwner (Additive)
+CREATE TABLE IF NOT EXISTS "CreativeProfileOwner" (
+  "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "creativeProfileId" UUID UNIQUE NOT NULL REFERENCES "CreativeProfile"("id") ON DELETE CASCADE,
+  "userId" UUID UNIQUE NOT NULL REFERENCES "User"("id") ON DELETE CASCADE,
+  "assignedById" UUID REFERENCES "User"("id") ON DELETE SET NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 8. CreativeWork (Showcase Additive)
+CREATE TABLE IF NOT EXISTS "CreativeWork" (
+  "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "creativeProfileId" UUID NOT NULL REFERENCES "CreativeProfile"("id") ON DELETE RESTRICT,
+  "title" TEXT NOT NULL,
+  "slug" TEXT UNIQUE NOT NULL,
+  "description" TEXT NOT NULL,
+  "imagePaths" TEXT NOT NULL DEFAULT '[]',
+  "technique" TEXT,
+  "motif" TEXT,
+  "year" INT,
+  "categoryId" UUID REFERENCES "Category"("id") ON DELETE SET NULL,
+  "status" "ContentStatus" NOT NULL DEFAULT 'DRAFT',
+  "reviewNote" TEXT,
+  "submittedAt" TIMESTAMPTZ,
+  "reviewedAt" TIMESTAMPTZ,
+  "reviewedById" UUID REFERENCES "User"("id") ON DELETE SET NULL,
+  "publishedAt" TIMESTAMPTZ,
+  "archivedAt" TIMESTAMPTZ,
+  "createdById" UUID REFERENCES "User"("id") ON DELETE SET NULL,
+  "updatedById" UUID REFERENCES "User"("id") ON DELETE SET NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT "chk_work_published" CHECK ("status" != 'PUBLISHED' OR "publishedAt" IS NOT NULL),
+  CONSTRAINT "chk_work_archived" CHECK ("status" != 'ARCHIVED' OR "archivedAt" IS NOT NULL),
+  CONSTRAINT "chk_work_review_note" CHECK ("status" NOT IN ('REJECTED', 'NEEDS_REVISION') OR ("reviewNote" IS NOT NULL AND length(trim("reviewNote")) > 0))
+);
+CREATE INDEX IF NOT EXISTS "idx_work_status_published" ON "CreativeWork"("status", "publishedAt" DESC);
+CREATE INDEX IF NOT EXISTS "idx_work_creator_status" ON "CreativeWork"("creativeProfileId", "status");
+CREATE INDEX IF NOT EXISTS "idx_work_category" ON "CreativeWork"("categoryId");
+
+-- 9. CreativeProduct (Pasar Additive)
+CREATE TABLE IF NOT EXISTS "CreativeProduct" (
+  "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "creativeProfileId" UUID NOT NULL REFERENCES "CreativeProfile"("id") ON DELETE RESTRICT,
+  "workId" UUID REFERENCES "CreativeWork"("id") ON DELETE SET NULL,
+  "title" TEXT NOT NULL,
+  "slug" TEXT UNIQUE NOT NULL,
+  "description" TEXT NOT NULL,
+  "imagePaths" TEXT NOT NULL DEFAULT '[]',
+  "productTypeId" UUID NOT NULL REFERENCES "Category"("id") ON DELETE RESTRICT,
+  "material" TEXT,
+  "dimensions" TEXT,
+  "priceMin" INT,
+  "priceMax" INT,
+  "priceUnit" VARCHAR(30),
+  "availability" "ProductAvailability" NOT NULL DEFAULT 'AVAILABLE',
+  "status" "ContentStatus" NOT NULL DEFAULT 'DRAFT',
+  "reviewNote" TEXT,
+  "submittedAt" TIMESTAMPTZ,
+  "reviewedAt" TIMESTAMPTZ,
+  "reviewedById" UUID REFERENCES "User"("id") ON DELETE SET NULL,
+  "publishedAt" TIMESTAMPTZ,
+  "archivedAt" TIMESTAMPTZ,
+  "createdById" UUID REFERENCES "User"("id") ON DELETE SET NULL,
+  "updatedById" UUID REFERENCES "User"("id") ON DELETE SET NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT "chk_prod_published" CHECK ("status" != 'PUBLISHED' OR "publishedAt" IS NOT NULL),
+  CONSTRAINT "chk_prod_archived" CHECK ("status" != 'ARCHIVED' OR "archivedAt" IS NOT NULL),
+  CONSTRAINT "chk_prod_price" CHECK ("priceMin" IS NULL OR "priceMax" IS NULL OR "priceMax" >= "priceMin"),
+  CONSTRAINT "chk_prod_price_positive" CHECK (("priceMin" IS NULL OR "priceMin" >= 0) AND ("priceMax" IS NULL OR "priceMax" >= 0)),
+  CONSTRAINT "chk_prod_review_note" CHECK ("status" NOT IN ('REJECTED', 'NEEDS_REVISION') OR ("reviewNote" IS NOT NULL AND length(trim("reviewNote")) > 0))
+);
+CREATE INDEX IF NOT EXISTS "idx_prod_status_published" ON "CreativeProduct"("status", "publishedAt" DESC);
+CREATE INDEX IF NOT EXISTS "idx_prod_creator_status" ON "CreativeProduct"("creativeProfileId", "status");
+CREATE INDEX IF NOT EXISTS "idx_prod_type" ON "CreativeProduct"("productTypeId");

@@ -58,18 +58,25 @@ export const LandingPage: React.FC = () => {
 
             <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
               <Link
-                to="/creative"
+                to="/showcase"
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold text-sm shadow-md shadow-amber-600/20 transition"
               >
-                <span>Jelajahi Pelaku Kreatif</span>
-                <ArrowRight className="w-4 h-4" />
+                <Sparkles className="w-4 h-4" />
+                <span>Showcase Karya Seni</span>
               </Link>
               <Link
-                to="/sub-apps"
+                to="/pasar"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-sm shadow-md shadow-emerald-700/20 transition"
+              >
+                <Grid className="w-4 h-4" />
+                <span>Pasar Ekraf Tuban</span>
+              </Link>
+              <Link
+                to="/creative"
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white hover:bg-slate-50 text-slate-800 font-semibold text-sm border border-slate-200 shadow-sm transition"
               >
-                <Grid className="w-4 h-4 text-amber-600" />
-                <span>Lihat Sub-App</span>
+                <span>Direktori Pelaku</span>
+                <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
           </div>

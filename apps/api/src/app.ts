@@ -11,6 +11,9 @@ import { uploadsRouter } from './routes/uploads.js';
 import { categoriesRouter, adminCategoriesRouter } from './routes/categories.js';
 import { subAppsRouter, adminSubAppsRouter } from './routes/subapps.js';
 import { creativeProfilesRouter, adminCreativeProfilesRouter } from './routes/creatives.js';
+import { worksRouter, creatorWorksRouter } from './routes/works.js';
+import { productsRouter, creatorProductsRouter } from './routes/products.js';
+import { adminModerationRouter } from './routes/moderation.js';
 import { adminRouter } from './routes/admin.js';
 
 export const app = express();
@@ -66,11 +69,16 @@ app.use('/api/v1/uploads', uploadsRouter);
 app.use('/api/v1/categories', categoriesRouter);
 app.use('/api/v1/sub-apps', subAppsRouter);
 app.use('/api/v1/creative-profiles', creativeProfilesRouter);
+app.use('/api/v1/works', worksRouter);
+app.use('/api/v1/products', productsRouter);
+app.use('/api/v1/me/works', creatorWorksRouter);
+app.use('/api/v1/me/products', creatorProductsRouter);
 
 // Admin Routes
 app.use('/api/v1/admin/categories', adminCategoriesRouter);
 app.use('/api/v1/admin/sub-apps', adminSubAppsRouter);
 app.use('/api/v1/admin/creative-profiles', adminCreativeProfilesRouter);
+app.use('/api/v1/admin', adminModerationRouter);
 app.use('/api/v1/admin', adminRouter);
 
 // Serve Web Frontend SPA if built

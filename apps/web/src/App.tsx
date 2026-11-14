@@ -8,14 +8,22 @@ import { SubAppsPage } from './pages/SubAppsPage.js';
 import { SubAppDetailPage } from './pages/SubAppDetailPage.js';
 import { CreativesPage } from './pages/CreativesPage.js';
 import { CreativeDetailPage } from './pages/CreativeDetailPage.js';
+import { ShowcasePage } from './pages/ShowcasePage.js';
+import { ShowcaseDetailPage } from './pages/ShowcaseDetailPage.js';
+import { PasarPage } from './pages/PasarPage.js';
+import { ProductDetailPage } from './pages/ProductDetailPage.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { RegisterPage } from './pages/RegisterPage.js';
 import { ProfilePage } from './pages/ProfilePage.js';
+import { CreatorDashboardPage } from './pages/creator/CreatorDashboardPage.js';
+import { ManageWorksPage } from './pages/creator/ManageWorksPage.js';
+import { ManageProductsPage } from './pages/creator/ManageProductsPage.js';
 import { AdminLayout } from './pages/admin/AdminLayout.js';
 import { AdminOverviewPage } from './pages/admin/AdminOverviewPage.js';
 import { AdminSubAppsPage } from './pages/admin/AdminSubAppsPage.js';
 import { AdminCreativesPage } from './pages/admin/AdminCreativesPage.js';
 import { AdminCategoriesPage } from './pages/admin/AdminCategoriesPage.js';
+import { AdminModerationPage } from './pages/admin/AdminModerationPage.js';
 
 export const App: React.FC = () => {
   return (
@@ -31,18 +39,26 @@ export const App: React.FC = () => {
               <Route path="/sub-apps/:slug" element={<SubAppDetailPage />} />
               <Route path="/creative" element={<CreativesPage />} />
               <Route path="/creative/:slug" element={<CreativeDetailPage />} />
+              <Route path="/showcase" element={<ShowcasePage />} />
+              <Route path="/showcase/:slug" element={<ShowcaseDetailPage />} />
+              <Route path="/pasar" element={<PasarPage />} />
+              <Route path="/pasar/:slug" element={<ProductDetailPage />} />
 
               {/* Auth Pages */}
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
 
-              {/* User Dashboard */}
+              {/* User & Creator Dashboard */}
               <Route path="/dashboard" element={<Navigate to="/dashboard/profile" replace />} />
               <Route path="/dashboard/profile" element={<ProfilePage />} />
+              <Route path="/dashboard/kreator" element={<CreatorDashboardPage />} />
+              <Route path="/dashboard/kreator/works" element={<ManageWorksPage />} />
+              <Route path="/dashboard/kreator/products" element={<ManageProductsPage />} />
 
               {/* Admin Panel */}
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<AdminOverviewPage />} />
+                <Route path="moderation" element={<AdminModerationPage />} />
                 <Route path="sub-apps" element={<AdminSubAppsPage />} />
                 <Route path="creative-profiles" element={<AdminCreativesPage />} />
                 <Route path="categories" element={<AdminCategoriesPage />} />

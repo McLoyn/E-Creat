@@ -9,8 +9,9 @@ generator client {
 }
 
 // Role: USER, ADMIN
-// ContentStatus: DRAFT, PUBLISHED, ARCHIVED
-// CategoryKind: SUBSECTOR, SUBAPP_TYPE
+// ContentStatus: DRAFT, PENDING_REVIEW, NEEDS_REVISION, REJECTED, PUBLISHED, ARCHIVED
+// CategoryKind: SUBSECTOR, SUBAPP_TYPE, WORK_CATEGORY, PRODUCT_TYPE
+// Availability: AVAILABLE, MADE_TO_ORDER, UNAVAILABLE
 
 model User {
   id           String        @id @default(uuid())
@@ -24,6 +25,7 @@ model User {
 
   profile      UserProfile?
   sessions     AuthSession[]
+  ownedProfile CreativeProfileOwner?
 }
 
 model UserProfile {
@@ -71,7 +73,7 @@ model AuthSession {
 
 model Category {
   id               String                    @id @default(uuid())
-  kind             String                    // SUBSECTOR | SUBAPP_TYPE
+  kind             String                    // SUBSECTOR | SUBAPP_TYPE | WORK_CATEGORY | PRODUCT_TYPE
   name             String
   slug             String
   description      String?
@@ -85,6 +87,8 @@ model Category {
   subApps          SubAppCategory[]
   creativeProfiles CreativeProfileCategory[]
   userInterests    UserProfileInterest[]
+  works            CreativeWork[]
+  products         CreativeProduct[]
 
   @@unique([kind, slug])
   @@unique([kind, name])
@@ -145,6 +149,9 @@ model CreativeProfile {
   updatedAt       DateTime                  @updatedAt
 
   categories      CreativeProfileCategory[]
+  owner           CreativeProfileOwner?
+  works           CreativeWork[]
+  products        CreativeProduct[]
 
   @@index([status, publishedAt])
   @@index([status, city])
@@ -160,4 +167,86 @@ model CreativeProfileCategory {
 
   @@id([creativeProfileId, categoryId])
   @@index([categoryId])
+}
+
+// K-01: Explicit Owner Link between User and CreativeProfile
+model CreativeProfileOwner {
+  id                String          @id @default(uuid())
+  creativeProfileId String          @unique
+  userId            String          @unique
+  assignedById      String?
+  createdAt         DateTime        @default(now())
+
+  creativeProfile   CreativeProfile @relation(fields: [creativeProfileId], references: [id], onDelete: Cascade)
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Showcase Works model
+model CreativeWork {
+  id                String          @id @default(uuid())
+  creativeProfileId String
+  title             String
+  slug              String          @unique
+  description       String
+  imagePaths        String          @default("[]") // JSON array string of up to 5 image paths
+  technique         String?
+  motif             String?
+  year              Int?
+  categoryId        String?
+  status            String          @default("DRAFT") // DRAFT, PENDING_REVIEW, NEEDS_REVISION, REJECTED, PUBLISHED, ARCHIVED
+  reviewNote        String?
+  submittedAt       DateTime?
+  reviewedAt        DateTime?
+  reviewedById      String?
+  publishedAt       DateTime?
+  archivedAt        DateTime?
+  createdById       String?
+  updatedById       String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  creativeProfile   CreativeProfile @relation(fields: [creativeProfileId], references: [id], onDelete: Restrict)
+  category          Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  products          CreativeProduct[]
+
+  @@index([status, publishedAt])
+  @@index([creativeProfileId, status])
+  @@index([categoryId])
+}
+
+// Pasar Creative Products model
+model CreativeProduct {
+  id                String          @id @default(uuid())
+  creativeProfileId String
+  workId            String?
+  title             String
+  slug              String          @unique
+  description       String
+  imagePaths        String          @default("[]") // JSON array string of up to 5 image paths
+  productTypeId     String
+  material          String?
+  dimensions        String?
+  priceMin          Int?
+  priceMax          Int?
+  priceUnit         String?
+  availability      String          @default("AVAILABLE") // AVAILABLE, MADE_TO_ORDER, UNAVAILABLE
+  status            String          @default("DRAFT") // DRAFT, PENDING_REVIEW, NEEDS_REVISION, REJECTED, PUBLISHED, ARCHIVED
+  reviewNote        String?
+  submittedAt       DateTime?
+  reviewedAt        DateTime?
+  reviewedById      String?
+  publishedAt       DateTime?
+  archivedAt        DateTime?
+  createdById       String?
+  updatedById       String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  creativeProfile   CreativeProfile @relation(fields: [creativeProfileId], references: [id], onDelete: Restrict)
+  productType       Category        @relation(fields: [productTypeId], references: [id], onDelete: Restrict)
+  work              CreativeWork?   @relation(fields: [workId], references: [id], onDelete: SetNull)
+
+  @@index([status, publishedAt])
+  @@index([creativeProfileId, status])
+  @@index([productTypeId])
 }

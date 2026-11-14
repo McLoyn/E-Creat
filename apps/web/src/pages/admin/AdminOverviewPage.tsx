@@ -11,6 +11,9 @@ import {
   CheckCircle2,
   FileEdit,
   Archive,
+  Sparkles,
+  ShoppingBag,
+  ShieldCheck,
 } from 'lucide-react';
 
 export const AdminOverviewPage: React.FC = () => {
@@ -109,10 +112,60 @@ export const AdminOverviewPage: React.FC = () => {
             Pengguna aktif dalam database
           </div>
         </div>
+
+        {/* Works Card */}
+        <div className="p-6 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Karya Showcase</span>
+            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+              <Sparkles className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="text-3xl font-extrabold text-slate-900">{stats?.works?.total ?? 0}</div>
+          <div className="flex items-center gap-2 pt-2 text-[11px] text-slate-500 border-t border-slate-100">
+            <span className="text-emerald-700 font-semibold">{stats?.works?.published ?? 0} Rilis</span>
+            <span>•</span>
+            <span className="text-amber-700 font-semibold">{stats?.works?.pending ?? 0} Review</span>
+          </div>
+        </div>
+
+        {/* Products Card */}
+        <div className="p-6 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Produk Pasar</span>
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <ShoppingBag className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="text-3xl font-extrabold text-slate-900">{stats?.products?.total ?? 0}</div>
+          <div className="flex items-center gap-2 pt-2 text-[11px] text-slate-500 border-t border-slate-100">
+            <span className="text-emerald-700 font-semibold">{stats?.products?.published ?? 0} Rilis</span>
+            <span>•</span>
+            <span className="text-amber-700 font-semibold">{stats?.products?.pending ?? 0} Review</span>
+          </div>
+        </div>
       </div>
 
       {/* Quick Access Sections */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Link
+          to="/admin/moderation"
+          className="p-6 rounded-2xl bg-white border border-slate-200/80 hover:border-purple-300 hover:shadow-md transition space-y-3 group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+          <h3 className="font-bold text-slate-900 group-hover:text-purple-600 transition">
+            Moderasi Karya & Produk
+          </h3>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Tinjau kurasi karya seni dan produk baru yang diajukan para kreator sebelum tayang publik.
+          </p>
+          <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-purple-600 pt-2">
+            <span>Buka Antrean Moderasi</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </div>
+        </Link>
         <Link
           to="/admin/sub-apps"
           className="p-6 rounded-2xl bg-white border border-slate-200/80 hover:border-amber-300 hover:shadow-md transition space-y-3 group"

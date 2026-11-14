@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface BadgeProps {
-  variant?: 'draft' | 'published' | 'archived' | 'category' | 'role';
+  variant?: 'draft' | 'published' | 'archived' | 'pending' | 'revision' | 'rejected' | 'category' | 'role';
   children: React.ReactNode;
   className?: string;
 }
@@ -12,9 +12,15 @@ export const Badge: React.FC<BadgeProps> = ({ variant = 'category', children, cl
       case 'published':
         return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       case 'draft':
+        return 'bg-slate-100 text-slate-700 border-slate-200';
+      case 'pending':
         return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'revision':
+        return 'bg-orange-50 text-orange-700 border-orange-200';
+      case 'rejected':
+        return 'bg-rose-50 text-rose-700 border-rose-200';
       case 'archived':
-        return 'bg-slate-100 text-slate-600 border-slate-200';
+        return 'bg-slate-100 text-slate-500 border-slate-200';
       case 'role':
         return 'bg-purple-50 text-purple-700 border-purple-200';
       case 'category':

@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, Outlet, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.js';
-import { LayoutDashboard, Grid, Users, Tag, ShieldAlert } from 'lucide-react';
+import { LayoutDashboard, Grid, Users, Tag, ShieldAlert, CheckCircle } from 'lucide-react';
 
 export const AdminLayout: React.FC = () => {
   const { user, loading } = useAuth();
@@ -24,6 +24,7 @@ export const AdminLayout: React.FC = () => {
 
   const navItems = [
     { to: '/admin', label: 'Ringkasan', icon: LayoutDashboard, end: true },
+    { to: '/admin/moderation', label: 'Moderasi Karya & Produk', icon: CheckCircle },
     { to: '/admin/sub-apps', label: 'Kelola Sub-App', icon: Grid },
     { to: '/admin/creative-profiles', label: 'Pelaku Kreatif', icon: Users },
     { to: '/admin/categories', label: 'Kategori & Taksonomi', icon: Tag },

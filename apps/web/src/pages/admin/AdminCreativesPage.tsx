@@ -11,6 +11,9 @@ import {
   AlertCircle,
   Upload,
   MapPin,
+  UserCheck,
+  Sparkles,
+  ShoppingBag,
 } from 'lucide-react';
 
 const TUBAN_DISTRICTS = [
@@ -42,6 +45,13 @@ export const AdminCreativesPage: React.FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
+  // Owner linking states (K-01)
+  const [ownerModalOpen, setOwnerModalOpen] = useState(false);
+  const [profileForOwner, setProfileForOwner] = useState<any | null>(null);
+  const [usersList, setUsersList] = useState<any[]>([]);
+  const [selectedOwnerUserId, setSelectedOwnerUserId] = useState('');
+  const [ownerSubmitting, setOwnerSubmitting] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -95,6 +105,35 @@ export const AdminCreativesPage: React.FC = () => {
     setSelectedCategories(profile.categories?.map((c: any) => c.category.id) || []);
     setFormError(null);
     setModalOpen(true);
+  };
+
+  const openOwnerModal = async (profile: any) => {
+    setProfileForOwner(profile);
+    setSelectedOwnerUserId(profile.owner?.user?.id || '');
+    setOwnerModalOpen(true);
+    try {
+      const res = await apiFetch<{ data: any[] }>('/admin/users');
+      setUsersList(res.data);
+    } catch (err) {
+      console.error('Failed to load users for owner linking:', err);
+    }
+  };
+
+  const handleSaveOwner = async (userId: string | null) => {
+    if (!profileForOwner) return;
+    setOwnerSubmitting(true);
+    try {
+      await apiFetch(`/admin/creative-profiles/${profileForOwner.id}/owner`, {
+        method: 'PUT',
+        body: JSON.stringify({ userId }),
+      });
+      setOwnerModalOpen(false);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'Gagal mengatur pemilik profil.');
+    } finally {
+      setOwnerSubmitting(false);
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -178,12 +217,11 @@ export const AdminCreativesPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Action Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Manajemen Pelaku Kreatif</h2>
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight">Pelaku Kreatif Tuban</h2>
           <p className="text-xs text-slate-500">
-            Kurasi dan validasi data profil perajin, jenama lokal, dan seniman se-Kabupaten Tuban.
+            Kelola profil talenta, direktori brand, serta penautan akun pemilik perajin (K-01).
           </p>
         </div>
         <button
@@ -195,7 +233,6 @@ export const AdminCreativesPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Table */}
       {loading ? (
         <div className="py-20 flex flex-col items-center justify-center text-slate-400 space-y-3 bg-white rounded-2xl border border-slate-200">
           <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
@@ -214,8 +251,9 @@ export const AdminCreativesPage: React.FC = () => {
               <thead className="bg-slate-50 text-slate-700 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200">
                 <tr>
                   <th className="px-6 py-4">Nama & Lokasi</th>
+                  <th className="px-6 py-4">Pemilik Akun (K-01)</th>
                   <th className="px-6 py-4">Subsektor</th>
-                  <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4">Status & Item</th>
                   <th className="px-6 py-4">Kontak</th>
                   <th className="px-6 py-4 text-right">Aksi & Publikasi</th>
                 </tr>
@@ -232,13 +270,38 @@ export const AdminCreativesPage: React.FC = () => {
                       <div className="text-[10px] text-slate-400 font-mono">slug: {c.slug}</div>
                     </td>
                     <td className="px-6 py-4">
+                      {c.owner?.user ? (
+                        <div className="space-y-1">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200 text-[11px] font-bold">
+                            <UserCheck className="w-3.5 h-3.5 text-amber-600" />
+                            <span>{c.owner.user.email}</span>
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            {c.owner.user.profile?.displayName || 'Pengguna Komunitas'}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-400 text-[10px] font-medium border border-slate-200">
+                          Belum Ditautkan
+                        </span>
+                      )}
+                      <div className="mt-1">
+                        <button
+                          onClick={() => openOwnerModal(c)}
+                          className="text-[11px] font-bold text-amber-700 hover:text-amber-800 underline"
+                        >
+                          {c.owner?.user ? 'Ubah Pemilik' : 'Tautkan Akun'}
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
                       <div className="flex flex-wrap gap-1">
                         {c.categories?.map((cat: any) => (
                           <Badge key={cat.category.id}>{cat.category.name}</Badge>
                         ))}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 space-y-1.5">
                       <Badge
                         variant={
                           c.status === 'PUBLISHED'
@@ -250,6 +313,17 @@ export const AdminCreativesPage: React.FC = () => {
                       >
                         {c.status}
                       </Badge>
+                      <div className="flex items-center gap-2 text-[10px] text-slate-500 font-semibold">
+                        <span className="flex items-center gap-1 text-amber-700">
+                          <Sparkles className="w-3 h-3" />
+                          <span>{c._count?.works || 0} karya</span>
+                        </span>
+                        <span>•</span>
+                        <span className="flex items-center gap-1 text-emerald-700">
+                          <ShoppingBag className="w-3 h-3" />
+                          <span>{c._count?.products || 0} produk</span>
+                        </span>
+                      </div>
                     </td>
                     <td className="px-6 py-4 space-y-0.5 font-mono text-[11px]">
                       {c.whatsappNumber && <div>WA: {c.whatsappNumber}</div>}
@@ -314,38 +388,38 @@ export const AdminCreativesPage: React.FC = () => {
         </div>
       )}
 
-      {/* Modal Create / Edit */}
+      {/* Profile Create / Edit Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-slate-100 my-8 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-lg font-bold text-slate-900">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-xl bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <h3 className="font-bold text-slate-800 text-sm">
                 {editingProfile ? 'Edit Pelaku Kreatif' : 'Tambah Pelaku Kreatif Baru'}
               </h3>
               <button
                 onClick={() => setModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {formError && (
-              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                <span>{formError}</span>
-              </div>
-            )}
+            <form onSubmit={handleFormSubmit} className="p-6 overflow-y-auto space-y-4 text-xs">
+              {formError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
 
-            <form onSubmit={handleFormSubmit} className="space-y-4">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700">Nama Pelaku / Studio *</label>
+                <label className="text-xs font-semibold text-slate-700">Nama Pelaku / Usaha *</label>
                 <input
                   type="text"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Contoh: Tenun Gedog Sekar Wangi"
+                  placeholder="Tenun Gedog Sekar Wangi"
                   className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-emerald-500"
                 />
               </div>
@@ -448,27 +522,26 @@ export const AdminCreativesPage: React.FC = () => {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700">Foto Karya / Profil</label>
+                <label className="text-xs font-semibold text-slate-700">Foto Profil / Logo Brand</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={imagePath}
                     onChange={(e) => setImagePath(e.target.value)}
-                    placeholder="https://... atau /uploads/..."
+                    placeholder="https://... atau upload"
                     className="flex-1 px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-emerald-500"
                   />
-                  <label className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer flex items-center gap-1">
-                    <Upload className="w-3.5 h-3.5" />
+                  <label className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl cursor-pointer flex items-center gap-1 font-semibold">
+                    <Upload className="w-4 h-4" />
                     <span>Upload</span>
                     <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
                   </label>
                 </div>
               </div>
 
-              {/* Subsector selection */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">Subsektor Ekraf (Wajib untuk Rilis)</label>
-                <div className="flex flex-wrap gap-1.5">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-slate-700">Subsektor Ekraf (Multi-select)</label>
+                <div className="flex flex-wrap gap-1.5 p-3 rounded-xl border border-slate-200 bg-white max-h-36 overflow-y-auto">
                   {categories.map((cat) => {
                     const isSelected = selectedCategories.includes(cat.id);
                     return (
@@ -512,6 +585,93 @@ export const AdminCreativesPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Owner Assignment Modal (K-01) */}
+      {ownerModalOpen && profileForOwner && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="space-y-0.5">
+                <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                  <UserCheck className="w-5 h-5 text-amber-600" />
+                  <span>Tautkan Akun Pemilik (K-01)</span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Profil: <strong>{profileForOwner.name}</strong>
+                </p>
+              </div>
+              <button onClick={() => setOwnerModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-700 rounded-xl">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
+                <strong className="block font-bold">Ketentuan Kepemilikan Profil (K-01):</strong>
+                <p className="text-amber-800 leading-relaxed">
+                  Menetapkan akun pengguna sebagai pemilik akan memberikan hak akses ke Studio Kreator
+                  untuk menambah, mengedit, dan mengajukan moderasi karya Showcase serta produk Pasar atas nama profil ini.
+                </p>
+              </div>
+
+              {profileForOwner.owner?.user && (
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                  <div className="text-xs">
+                    <span className="text-slate-400 block">Pemilik Saat Ini:</span>
+                    <strong className="text-slate-800">{profileForOwner.owner.user.email}</strong>
+                  </div>
+                  <button
+                    disabled={ownerSubmitting}
+                    onClick={() => handleSaveOwner(null)}
+                    className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold border border-rose-200"
+                  >
+                    Cabut Tautan
+                  </button>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Pilih Akun Pengguna</label>
+                <select
+                  value={selectedOwnerUserId}
+                  onChange={(e) => setSelectedOwnerUserId(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white"
+                >
+                  <option value="">-- Pilih Akun Terdaftar --</option>
+                  {usersList.map((u) => {
+                    const isAlreadyLinkedOther =
+                      u.creatorOwnership && u.creatorOwnership.creativeProfileId !== profileForOwner.id;
+                    return (
+                      <option key={u.id} value={u.id} disabled={isAlreadyLinkedOther}>
+                        {u.email} ({u.profile?.displayName || 'User'})
+                        {isAlreadyLinkedOther ? ` - (Sudah tertaut: ${u.creatorOwnership.creativeProfile.name})` : ''}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setOwnerModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={ownerSubmitting || !selectedOwnerUserId}
+                  onClick={() => handleSaveOwner(selectedOwnerUserId)}
+                  className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow transition disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {ownerSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Tautkan Akun'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

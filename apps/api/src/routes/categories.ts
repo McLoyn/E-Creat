@@ -21,10 +21,11 @@ categoriesRouter.get('/', async (req: Request, res: Response, next: NextFunction
     const kind = req.query.kind as string;
     const where: any = { isActive: true };
     if (kind) {
-      if (!['SUBSECTOR', 'SUBAPP_TYPE'].includes(kind.toUpperCase())) {
+      const allowed = ['SUBSECTOR', 'SUBAPP_TYPE', 'WORK_CATEGORY', 'PRODUCT_TYPE'];
+      if (!allowed.includes(kind.toUpperCase())) {
         throw new AppError({
           code: 'VALIDATION_FAILED',
-          message: 'Parameter kind harus bernilai SUBSECTOR atau SUBAPP_TYPE.',
+          message: 'Parameter kind harus bernilai SUBSECTOR, SUBAPP_TYPE, WORK_CATEGORY, atau PRODUCT_TYPE.',
           status: 422,
         });
       }
@@ -60,6 +61,8 @@ adminCategoriesRouter.get('/', requireAdmin, async (req: Request, res: Response,
             subApps: true,
             creativeProfiles: true,
             userInterests: true,
+            works: true,
+            products: true,
           },
         },
       },
@@ -76,10 +79,11 @@ adminCategoriesRouter.post('/', requireAdmin, async (req: Request, res: Response
   try {
     const { kind, name, slug, description, sortOrder, isActive } = req.body;
 
-    if (!kind || !['SUBSECTOR', 'SUBAPP_TYPE'].includes(kind.toUpperCase())) {
+    const allowed = ['SUBSECTOR', 'SUBAPP_TYPE', 'WORK_CATEGORY', 'PRODUCT_TYPE'];
+    if (!kind || !allowed.includes(kind.toUpperCase())) {
       throw new AppError({
         code: 'VALIDATION_FAILED',
-        message: 'Field kind wajib diisi dengan SUBSECTOR atau SUBAPP_TYPE.',
+        message: 'Field kind wajib diisi dengan SUBSECTOR, SUBAPP_TYPE, WORK_CATEGORY, atau PRODUCT_TYPE.',
         status: 422,
       });
     }
@@ -211,6 +215,8 @@ adminCategoriesRouter.delete('/:id', requireAdmin, async (req: Request, res: Res
             subApps: true,
             creativeProfiles: true,
             userInterests: true,
+            works: true,
+            products: true,
           },
         },
       },
@@ -224,7 +230,12 @@ adminCategoriesRouter.delete('/:id', requireAdmin, async (req: Request, res: Res
       });
     }
 
-    const totalUsage = category._count.subApps + category._count.creativeProfiles + category._count.userInterests;
+    const totalUsage =
+      category._count.subApps +
+      category._count.creativeProfiles +
+      category._count.userInterests +
+      category._count.works +
+      category._count.products;
     if (totalUsage > 0) {
       throw new AppError({
         code: 'CONFLICT',

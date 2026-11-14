@@ -57,7 +57,7 @@ async function main() {
     }
   }
 
-  // 3. Seed Categories (SUBSECTOR & SUBAPP_TYPE)
+  // 3. Seed Categories (SUBSECTOR, SUBAPP_TYPE, WORK_CATEGORY, PRODUCT_TYPE)
   const subsectors = [
     { name: 'Kriya (Kerajinan)', slug: 'kriya', description: 'Kerajinan tangan, batik gedog, ukiran, dan anyaman khas Tuban.' },
     { name: 'Kuliner', slug: 'kuliner', description: 'Olahan makanan tradisional dan modern legendaris Tuban.' },
@@ -74,6 +74,21 @@ async function main() {
     { name: 'Kolaborasi & Ruang Kreatif', slug: 'kolaborasi-ruang', description: 'Fasilitas dan portal kerja bersama antar komunitas.' },
     { name: 'Pusat Event & Kalender', slug: 'event-kalender', description: 'Jadwal festival, pameran, dan workshop kreatif.' },
     { name: 'Pemberdayaan & Edukasi', slug: 'pemberdayaan-edukasi', description: 'Pelatihan kapasitas, sertifikasi, dan inkubasi talenta.' },
+  ];
+
+  const workCategories = [
+    { name: 'Batik Tulis Gedhog', slug: 'batik-tulis-gedhog', description: 'Karya seni batik tulis di atas kain tenun kapas gedhog Kerek Tuban.' },
+    { name: 'Tenun Tradisional Gedhog', slug: 'tenun-tradisional-gedhog', description: 'Tenunan pusaka dengan teknik alat tenun gedhog khas desa Kerek.' },
+    { name: 'Selendang & Pusaka Adat', slug: 'selendang-pusaka-adat', description: 'Wastra ritual adat, selendang upacara, dan kain warisan leluhur.' },
+    { name: 'Kriya Kontemporer', slug: 'kriya-kontemporer', description: 'Eksplorasi modern seni kriya dan tekstil berbasis tradisi lokal Tuban.' },
+  ];
+
+  const productTypes = [
+    { name: 'Kain Panjang', slug: 'kain-panjang', description: 'Kain lembaran tenun dan batik berukuran standar untuk busana atau koleksi.' },
+    { name: 'Sarung Tenun Gedhog', slug: 'sarung-tenun-gedhog', description: 'Sarung etnik tradisional tenun tangan untuk upacara adat dan ibadah.' },
+    { name: 'Selendang / Scarf', slug: 'selendang-scarf', description: 'Syal dan selendang tenun gedhog modis untuk aksesoris busana.' },
+    { name: 'Busana Siap Pakai', slug: 'busana-siap-pakai', description: 'Pakaian jadi seperti kemeja, outer, dan rompi berbahan kain gedhog.' },
+    { name: 'Aksesoris & Dekorasi', slug: 'aksesoris-dekorasi', description: 'Tas, bantalan kursi, taplak meja, dan hiasan dinding etnik.' },
   ];
 
   const categoryMap = new Map<string, string>();
@@ -96,6 +111,26 @@ async function main() {
       create: { kind: 'SUBAPP_TYPE', name: item.name, slug: item.slug, description: item.description, sortOrder: idx },
     });
     categoryMap.set(`type:${item.slug}`, cat.id);
+  }
+
+  for (let idx = 0; idx < workCategories.length; idx++) {
+    const item = workCategories[idx];
+    const cat = await prisma.category.upsert({
+      where: { kind_slug: { kind: 'WORK_CATEGORY', slug: item.slug } },
+      update: { name: item.name, description: item.description, sortOrder: idx },
+      create: { kind: 'WORK_CATEGORY', name: item.name, slug: item.slug, description: item.description, sortOrder: idx },
+    });
+    categoryMap.set(`work:${item.slug}`, cat.id);
+  }
+
+  for (let idx = 0; idx < productTypes.length; idx++) {
+    const item = productTypes[idx];
+    const cat = await prisma.category.upsert({
+      where: { kind_slug: { kind: 'PRODUCT_TYPE', slug: item.slug } },
+      update: { name: item.name, description: item.description, sortOrder: idx },
+      create: { kind: 'PRODUCT_TYPE', name: item.name, slug: item.slug, description: item.description, sortOrder: idx },
+    });
+    categoryMap.set(`product:${item.slug}`, cat.id);
   }
 
   // 4. Seed Sub-Apps (5 apps: PUBLISHED, DRAFT, ARCHIVED)
@@ -326,6 +361,215 @@ async function main() {
         },
       });
       console.log(`Created CreativeProfile: ${prof.name} (${prof.status})`);
+    }
+  }
+
+  // 6. Link Creator 1 to Tenun Gedog Sekar Wangi profile (K-01 Owner Assignment)
+  const sekarWangiProfile = await prisma.creativeProfile.findUnique({
+    where: { slug: 'tenun-gedog-sekar-wangi' },
+  });
+  const creator1User = await prisma.user.findUnique({
+    where: { email: 'kreator1@ekraftuban.id' },
+  });
+
+  if (sekarWangiProfile && creator1User) {
+    await prisma.creativeProfileOwner.upsert({
+      where: { creativeProfileId: sekarWangiProfile.id },
+      update: { userId: creator1User.id },
+      create: {
+        creativeProfileId: sekarWangiProfile.id,
+        userId: creator1User.id,
+      },
+    });
+    console.log(`Linked ${creator1User.email} as owner of ${sekarWangiProfile.name}`);
+  }
+
+  // 7. Seed Creative Works (Showcase)
+  if (sekarWangiProfile) {
+    const sampleWorks = [
+      {
+        slug: 'kain-gedhog-motif-ganggang-sari',
+        title: 'Kain Gedhog Motif Ganggang Sari Pewarna Alami',
+        description: 'Karya adiluhung batik tulis canting di atas tenunan kapas gedhog Kerek Tuban. Motif Ganggang Sari mencerminkan keselarasan ekosistem pesisir Tuban dengan aliran air tawar yang membawa kesuburan. Proses pengerjaan canting membutuhkan ketelitian selama 2 bulan menggunakan pewarna alami indigofera dan kulit kayu tingi.',
+        year: 2024,
+        technique: 'Batik Tulis Canting Tangan & Tenun Gedhog Tradisional',
+        motif: 'Ganggang Sari',
+        imagePaths: JSON.stringify([
+          'https://images.unsplash.com/photo-1607344645866-009c320c5ab8?w=800&auto=format&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1528459801416-a9e53bbf4e17?w=800&auto=format&fit=crop&q=80',
+        ]),
+        categorySlug: 'batik-tulis-gedhog',
+        status: 'PUBLISHED',
+        publishedAt: new Date(),
+      },
+      {
+        slug: 'tenun-gedhog-kuno-rantai-mas-pusaka',
+        title: 'Tenun Gedhog Kuno Rantai Mas Pusaka',
+        description: 'Karya tenunan pusaka dengan kerapatan tenun ekstra tinggi. Menggunakan teknik pakan dan lusi manual yang diwariskan turun-temurun sejak era Majapahit di Kadipaten Tuban dengan serat kapas lokal organik hasil pemintalan kenthongan tradisional.',
+        year: 2023,
+        technique: 'Tenun Tradisional Alat Kayu Gedhog Kerek',
+        motif: 'Rantai Mas',
+        imagePaths: JSON.stringify([
+          'https://images.unsplash.com/photo-1542744094-3a31f272c490?w=800&auto=format&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=800&auto=format&fit=crop&q=80',
+        ]),
+        categorySlug: 'tenun-tradisional-gedhog',
+        status: 'PUBLISHED',
+        publishedAt: new Date(),
+      },
+      {
+        slug: 'selendang-gedhog-lok-can-pesisir',
+        title: 'Selendang Gedhog Motif Lok Can Akulturasi Pesisir',
+        description: 'Motif Lok Can merupakan bukti otentik akulturasi budaya Tionghoa dan Jawa pesisir di pelabuhan kuno Tuban, menghadirkan harmoni visual burung phoenix dalam balutan warna bumi alami dari kulit kayu mahoni dan tingi.',
+        year: 2024,
+        technique: 'Batik Tulis Halus & Tenun Lurik Lembut',
+        motif: 'Lok Can',
+        imagePaths: JSON.stringify([
+          'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=800&auto=format&fit=crop&q=80',
+        ]),
+        categorySlug: 'selendang-pusaka-adat',
+        status: 'PUBLISHED',
+        publishedAt: new Date(),
+      },
+      {
+        slug: 'eksplorasi-motif-kijing-miring-kontemporer',
+        title: 'Eksplorasi Motif Kijing Miring Kontemporer',
+        description: 'Eksperimen silang teknik memadukan motif klasik Kijing Miring dengan komposisi asimetris dan tekstur serat nanas alami yang lebih ringan untuk kebutuhan interior modern.',
+        year: 2025,
+        technique: 'Batik Tulis Lilin Dingin & Tenun Gedhog Kombinasi',
+        motif: 'Kijing Miring',
+        imagePaths: JSON.stringify([
+          'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=800&auto=format&fit=crop&q=80',
+        ]),
+        categorySlug: 'batik-tulis-gedhog',
+        status: 'PENDING_REVIEW',
+        submittedAt: new Date(),
+      },
+    ];
+
+    for (const w of sampleWorks) {
+      const catId = categoryMap.get(`work:${w.categorySlug}`);
+      const existing = await prisma.creativeWork.findUnique({ where: { slug: w.slug } });
+      if (!existing) {
+        await prisma.creativeWork.create({
+          data: {
+            creativeProfileId: sekarWangiProfile.id,
+            slug: w.slug,
+            title: w.title,
+            description: w.description,
+            year: w.year,
+            technique: w.technique,
+            motif: w.motif,
+            imagePaths: w.imagePaths,
+            categoryId: catId,
+            status: w.status,
+            publishedAt: (w as any).publishedAt,
+            submittedAt: (w as any).submittedAt,
+          },
+        });
+        console.log(`Created CreativeWork: ${w.title} (${w.status})`);
+      }
+    }
+
+    // 8. Seed Creative Products (Pasar)
+    const sampleProducts = [
+      {
+        slug: 'kain-tenun-gedhog-tulis-asli-kerek-motif-kijing-miring',
+        title: 'Kain Tenun Gedhog Tulis Asli Kerek Motif Kijing Miring',
+        description: 'Kain tenun gedhog lembaran asli khas desa Margorejo Kerek Tuban. Menggunakan kapas asli yang dipintal manual dan dibatik canting halus. Sangat anggun untuk bahan busana resmi maupun koleksi wastra nusantara.',
+        priceMin: 850000,
+        priceMax: 850000,
+        priceUnit: 'lembar',
+        availability: 'AVAILABLE',
+        categorySlug: 'kain-panjang',
+        dimensions: '220 x 105 cm',
+        material: '100% Benang Kapas Tenun Tangan, Pewarna Alami Indigo & Kulit Kayu',
+        imagePaths: JSON.stringify([
+          'https://images.unsplash.com/photo-1607344645866-009c320c5ab8?w=800&auto=format&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1528459801416-a9e53bbf4e17?w=800&auto=format&fit=crop&q=80',
+        ]),
+        status: 'PUBLISHED',
+        publishedAt: new Date(),
+      },
+      {
+        slug: 'sarung-tenun-gedhog-pewarna-alami-sogan-tuban',
+        title: 'Sarung Tenun Gedhog Pewarna Alami Sogan Tuban',
+        description: 'Sarung tenun etnik berkarakter kokoh dengan sentuhan warna alam kayu mahoni dan tingi khas Tuban pesisir. Dibuat terbatas dengan detail tepi rumbai khas.',
+        priceMin: 1200000,
+        priceMax: 1500000,
+        priceUnit: 'pcs',
+        availability: 'MADE_TO_ORDER',
+        categorySlug: 'sarung-tenun-gedhog',
+        dimensions: '210 x 110 cm',
+        material: 'Tenun Gedhog Kerek Halus, Pewarna Sogan Organik',
+        imagePaths: JSON.stringify([
+          'https://images.unsplash.com/photo-1542744094-3a31f272c490?w=800&auto=format&fit=crop&q=80',
+        ]),
+        status: 'PUBLISHED',
+        publishedAt: new Date(),
+      },
+      {
+        slug: 'scarf-tenun-gedhog-minimalis-pesisiran',
+        title: 'Scarf Tenun Gedhog Minimalis Pesisiran',
+        description: 'Syal tenun ringan dengan tekstur khas gedhog yang bernapas dan sejuk dipakai. Cocok sebagai pelengkap busana santai atau cinderamata khas Tuban bernilai tinggi.',
+        priceMin: 275000,
+        priceMax: 350000,
+        priceUnit: 'pcs',
+        availability: 'AVAILABLE',
+        categorySlug: 'selendang-scarf',
+        dimensions: '180 x 45 cm',
+        material: 'Benang Katun Pintal Halus Pewarna Ramah Lingkungan',
+        imagePaths: JSON.stringify([
+          'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=800&auto=format&fit=crop&q=80',
+        ]),
+        status: 'PUBLISHED',
+        publishedAt: new Date(),
+      },
+      {
+        slug: 'kemeja-tenun-gedhog-pria-custom',
+        title: 'Kemeja Tenun Gedhog Pria Custom Lengan Panjang',
+        description: 'Kemeja pria eksklusif dari kain tenun gedhog pilihan dipadu furing trikot yang nyaman. Ukuran dan variasi motif disesuaikan dengan permintaan pembeli.',
+        priceMin: 950000,
+        priceMax: 1150000,
+        priceUnit: 'pcs',
+        availability: 'MADE_TO_ORDER',
+        categorySlug: 'busana-siap-pakai',
+        dimensions: 'Custom Size (S, M, L, XL, XXL)',
+        material: 'Kain Tenun Gedhog Asli Kerek & Furing Katun Adem',
+        imagePaths: JSON.stringify([
+          'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=800&auto=format&fit=crop&q=80',
+        ]),
+        status: 'PENDING_REVIEW',
+        submittedAt: new Date(),
+      },
+    ];
+
+    for (const p of sampleProducts) {
+      const catId = categoryMap.get(`product:${p.categorySlug}`);
+      if (!catId) continue;
+      const existing = await prisma.creativeProduct.findUnique({ where: { slug: p.slug } });
+      if (!existing) {
+        await prisma.creativeProduct.create({
+          data: {
+            creativeProfileId: sekarWangiProfile.id,
+            slug: p.slug,
+            title: p.title,
+            description: p.description,
+            priceMin: p.priceMin,
+            priceMax: p.priceMax,
+            priceUnit: p.priceUnit,
+            availability: p.availability,
+            productTypeId: catId,
+            dimensions: p.dimensions,
+            material: p.material,
+            imagePaths: p.imagePaths,
+            status: p.status,
+            publishedAt: (p as any).publishedAt,
+            submittedAt: (p as any).submittedAt,
+          },
+        });
+        console.log(`Created CreativeProduct: ${p.title} (${p.status})`);
+      }
     }
   }
 

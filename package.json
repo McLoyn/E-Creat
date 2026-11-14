@@ -4,8 +4,8 @@
   "private": true,
   "description": "Ekraf HUB V0.1 — Platform Ekosistem Ekonomi Kreatif Tuban",
   "scripts": {
-    "dev": "npx tsx apps/api/src/server.ts",
-    "start": "npx tsx apps/api/src/server.ts",
+    "dev": "./apps/api/node_modules/.bin/tsx apps/api/src/server.ts",
+    "start": "./apps/api/node_modules/.bin/tsx apps/api/src/server.ts",
     "dev:api": "pnpm --filter @ekraf/api dev",
     "dev:web": "pnpm --filter @ekraf/web dev",
     "build": "pnpm --filter \"@ekraf/*\" build",

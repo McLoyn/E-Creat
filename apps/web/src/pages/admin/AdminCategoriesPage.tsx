@@ -14,7 +14,7 @@ import {
 
 export const AdminCategoriesPage: React.FC = () => {
   const [categories, setCategories] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'SUBSECTOR' | 'SUBAPP_TYPE'>('SUBSECTOR');
+  const [activeTab, setActiveTab] = useState<'SUBSECTOR' | 'SUBAPP_TYPE' | 'WORK_CATEGORY' | 'PRODUCT_TYPE'>('SUBSECTOR');
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCat, setEditingCat] = useState<any | null>(null);
@@ -152,7 +152,7 @@ export const AdminCategoriesPage: React.FC = () => {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-slate-200">
+      <div className="flex flex-wrap gap-2 border-b border-slate-200">
         <button
           onClick={() => setActiveTab('SUBSECTOR')}
           className={`px-4 py-2.5 text-xs font-bold border-b-2 transition ${
@@ -161,7 +161,7 @@ export const AdminCategoriesPage: React.FC = () => {
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          Subsektor Ekonomi Kreatif ({categories.filter((c) => c.kind === 'SUBSECTOR').length})
+          Subsektor Ekraf ({categories.filter((c) => c.kind === 'SUBSECTOR').length})
         </button>
         <button
           onClick={() => setActiveTab('SUBAPP_TYPE')}
@@ -171,7 +171,27 @@ export const AdminCategoriesPage: React.FC = () => {
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          Jenis Sub-Aplikasi ({categories.filter((c) => c.kind === 'SUBAPP_TYPE').length})
+          Jenis Sub-App ({categories.filter((c) => c.kind === 'SUBAPP_TYPE').length})
+        </button>
+        <button
+          onClick={() => setActiveTab('WORK_CATEGORY')}
+          className={`px-4 py-2.5 text-xs font-bold border-b-2 transition ${
+            activeTab === 'WORK_CATEGORY'
+              ? 'border-amber-600 text-amber-700'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          Kategori Showcase ({categories.filter((c) => c.kind === 'WORK_CATEGORY').length})
+        </button>
+        <button
+          onClick={() => setActiveTab('PRODUCT_TYPE')}
+          className={`px-4 py-2.5 text-xs font-bold border-b-2 transition ${
+            activeTab === 'PRODUCT_TYPE'
+              ? 'border-emerald-600 text-emerald-700'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          Jenis Produk Pasar ({categories.filter((c) => c.kind === 'PRODUCT_TYPE').length})
         </button>
       </div>
 
