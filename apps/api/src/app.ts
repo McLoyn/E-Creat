@@ -109,3 +109,5 @@ app.use((_req, _res, next) => {
 
 // Centralized Error Handler
 app.use(errorHandler);
+
+export default app;

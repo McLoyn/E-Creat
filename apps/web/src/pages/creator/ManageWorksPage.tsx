@@ -144,14 +144,11 @@ export const ManageWorksPage: React.FC = () => {
       const formData = new FormData();
       formData.append('file', file);
 
-      const res = await fetch('/api/v1/uploads/images', {
+      const res = await apiFetch<{ data: { path: string } }>('/uploads/images', {
         method: 'POST',
         body: formData,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.message || 'Gagal mengunggah foto.');
-
-      setFormImages([...formImages, data.data.path]);
+      setFormImages([...formImages, res.data.path]);
     } catch (err: any) {
       alert(err.message || 'Gagal mengunggah gambar.');
     } finally {

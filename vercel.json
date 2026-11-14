@@ -1,18 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "services": {
-    "api": {
-      "root": "apps/api",
-      "framework": "express"
-    },
-    "web": {
-      "root": "apps/web",
-      "framework": "vite"
-    }
-  },
+  "buildCommand": "pnpm --filter @ekraf/web build",
+  "outputDirectory": "apps/web/dist",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": { "service": "api" } },
-    { "source": "/uploads/(.*)", "destination": { "service": "api" } },
-    { "source": "/(.*)", "destination": { "service": "web" } }
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ]
 }

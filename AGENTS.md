@@ -5,6 +5,5 @@
 - Demo users: Admin `admin@ekraftuban.id` / `AdminPassword123!`, Creator `kreator1@ekraftuban.id` / `UserPassword123!`.
 
 ## Deploy
-- Vercel multi-service project configured in root `vercel.json`: `api` (`apps/api`, Express) and `web` (`apps/web`, Vite) share one domain.
-- Rewrites: `/api/*` and `/uploads/*` → API service; everything else → web SPA service. No code changes needed (web calls API via relative `/api/v1` URLs).
-- No bindings required — no server-to-service calls exist yet.
+- Vercel: root `vercel.json` builds web SPA (`apps/web/dist`). Frontend connects to backend via `VITE_API_BASE_URL` env variable.
+- Backend: Express + Prisma SQLite/PostgreSQL deployable on Render/Railway/Fly.io or VPS. Schema ready for Supabase (`docs/supabase_schema.sql`).
