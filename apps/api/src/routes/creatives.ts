@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../db.js';
+import { Prisma, CreativeWork, CreativeProduct, CreativeProfileCategory } from '@prisma/client';
 import { requireAdmin } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/error.js';
 
@@ -423,7 +424,7 @@ adminCreativeProfilesRouter.patch('/:id', requireAdmin, async (req: Request, res
       }
     }
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       if (categoryIds !== undefined && Array.isArray(categoryIds)) {
         await tx.creativeProfileCategory.deleteMany({ where: { creativeProfileId: id } });
         if (categoryIds.length > 0) {

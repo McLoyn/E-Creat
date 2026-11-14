@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../../api/client.js';
-import { Badge } from '../../components/Badge.js';
 import {
   Plus,
   Tag,

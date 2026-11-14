@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, Outlet, Navigate } from 'react-router-dom';
+import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.js';
 import { LayoutDashboard, Grid, Users, Tag, ShieldAlert, CheckCircle } from 'lucide-react';
 

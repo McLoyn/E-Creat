@@ -4,8 +4,6 @@ import { Badge } from '../../components/Badge.js';
 import {
   Plus,
   Grid,
-  CheckCircle,
-  FileEdit,
   Archive,
   RotateCcw,
   ExternalLink,

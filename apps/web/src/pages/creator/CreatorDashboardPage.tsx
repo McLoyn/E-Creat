@@ -2,30 +2,26 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { apiFetch } from '../../api/client.js';
 import { useAuth } from '../../context/AuthContext.js';
-import { Badge } from '../../components/Badge.js';
 import {
   Palette,
   Sparkles,
   ShoppingBag,
   Clock,
   AlertCircle,
-  CheckCircle,
   Plus,
   ArrowRight,
   Loader2,
   Building2,
-  MapPin,
-  ExternalLink,
 } from 'lucide-react';
 
 export const CreatorDashboardPage: React.FC = () => {
   const { user } = useAuth();
   const [works, setWorks] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
-  const [profile, setProfile] = useState<any | null>(null);
+  const [, setProfile] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [unlinked, setUnlinked] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadCreatorData() {

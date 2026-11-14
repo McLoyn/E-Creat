@@ -8,8 +8,6 @@ import {
   Filter,
   Eye,
   Loader2,
-  Calendar,
-  Layers,
   Info,
   MapPin,
   ArrowRight,

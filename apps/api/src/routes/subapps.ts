@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../db.js';
+import { Prisma, SubAppCategory } from '@prisma/client';
 import { requireAdmin } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/error.js';
 
@@ -299,7 +300,7 @@ adminSubAppsRouter.patch('/:id', requireAdmin, async (req: Request, res: Respons
       }
     }
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       if (categoryIds !== undefined && Array.isArray(categoryIds)) {
         await tx.subAppCategory.deleteMany({ where: { subAppId: id } });
         if (categoryIds.length > 0) {
@@ -365,7 +366,7 @@ adminSubAppsRouter.post('/:id/publish', requireAdmin, async (req: Request, res: 
     }
 
     // Must have at least one active category to publish
-    const hasActiveCategory = subApp.categories.some((c) => c.category.isActive);
+    const hasActiveCategory = subApp.categories.some((c) => (c as { category: { isActive: boolean } }).category.isActive);
     if (!hasActiveCategory) {
       throw new AppError({
         code: 'INVALID_STATE_TRANSITION',

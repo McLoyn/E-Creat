@@ -99,7 +99,7 @@ adminRouter.get('/users', requireAdmin, async (_req: Request, res: Response, nex
         profile: {
           select: { displayName: true },
         },
-        creatorOwnership: {
+        ownedProfile: {
           select: {
             creativeProfileId: true,
             creativeProfile: { select: { id: true, name: true, slug: true } },

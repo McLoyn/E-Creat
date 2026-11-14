@@ -7,13 +7,11 @@ import {
   Sparkles,
   MapPin,
   Calendar,
-  Layers,
   Phone,
   Instagram,
   Globe,
   ExternalLink,
   Loader2,
-  Tag,
   ShoppingBag,
   Info,
 } from 'lucide-react';

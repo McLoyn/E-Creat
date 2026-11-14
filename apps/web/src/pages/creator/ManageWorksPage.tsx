@@ -10,8 +10,6 @@ import {
   Send,
   Archive,
   AlertCircle,
-  Clock,
-  CheckCircle,
   X,
   Upload,
   Loader2,

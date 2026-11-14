@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto, { randomUUID } from 'crypto';
 import { prisma } from '../db.js';
+import { Prisma } from '@prisma/client';
 import { AppError } from '../middlewares/error.js';
 import { signAccessToken, signRefreshToken, verifyRefreshToken, requireAuth } from '../middlewares/auth.js';
 
@@ -80,7 +81,7 @@ authRouter.post('/register', async (req: Request, res: Response, next: NextFunct
     const familyId = randomUUID();
 
     // Atomic transaction for User + UserProfile + initial AuthSession
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const user = await tx.user.create({
         data: {
           email: normalizedEmail,

@@ -9,11 +9,8 @@ import {
   ArrowRight,
   Loader2,
   CheckCircle2,
-  FileEdit,
-  Archive,
   Sparkles,
   ShoppingBag,
-  ShieldCheck,
 } from 'lucide-react';
 
 export const AdminOverviewPage: React.FC = () => {

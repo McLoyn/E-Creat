@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { apiFetch } from '../api/client.js';
-import { Badge } from '../components/Badge.js';
 import {
   ArrowLeft,
   ShoppingBag,
@@ -15,7 +14,6 @@ import {
   Loader2,
   Sparkles,
   Info,
-  Layers,
   ArrowRight,
 } from 'lucide-react';
 

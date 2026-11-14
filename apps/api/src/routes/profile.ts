@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../db.js';
+import { Prisma } from '@prisma/client';
 import { requireAuth } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/error.js';
 
@@ -101,7 +102,7 @@ profileRouter.patch('/', requireAuth, async (req: Request, res: Response, next: 
       });
     }
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       if (interestCategoryIds !== undefined) {
         await tx.userProfileInterest.deleteMany({
           where: { userProfileId: currentProfile.id },

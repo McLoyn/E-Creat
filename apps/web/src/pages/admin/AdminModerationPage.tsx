@@ -7,10 +7,7 @@ import {
   Clock,
   Sparkles,
   ShoppingBag,
-  ExternalLink,
-  MessageSquare,
   Loader2,
-  AlertTriangle,
   RotateCcw,
   Check,
   X,
@@ -162,12 +159,12 @@ export const AdminModerationPage: React.FC = () => {
     const unit = p.priceUnit ? ` / ${p.priceUnit}` : '';
     if (p.priceMin === null && p.priceMax === null) return 'Hubungi Penjual';
     if (p.priceMin !== null && p.priceMax !== null && p.priceMin === p.priceMax) {
-      return `Rp ${p.priceMin.toLocaleString('id-ID')}${unit}`;
+      return `Rp ${p.priceMin!.toLocaleString('id-ID')}${unit}`;
     }
     if (p.priceMin !== null && p.priceMax !== null) {
-      return `Rp ${p.priceMin.toLocaleString('id-ID')} - Rp ${p.priceMax.toLocaleString('id-ID')}${unit}`;
+      return `Rp ${p.priceMin!.toLocaleString('id-ID')} - Rp ${p.priceMax!.toLocaleString('id-ID')}${unit}`;
     }
-    if (p.priceMin !== null) return `Mulai Rp ${p.priceMin.toLocaleString('id-ID')}${unit}`;
+    if (p.priceMin !== null) return `Mulai Rp ${p.priceMin!.toLocaleString('id-ID')}${unit}`;
     return `Maks. Rp ${p.priceMax?.toLocaleString('id-ID')}${unit}`;
   };
 

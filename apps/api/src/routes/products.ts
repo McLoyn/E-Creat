@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../db.js';
+import { Prisma, CreativeProduct } from '@prisma/client';
 import { requireAuth } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/error.js';
 import { getLinkedCreativeProfile } from '../middlewares/ownership.js';

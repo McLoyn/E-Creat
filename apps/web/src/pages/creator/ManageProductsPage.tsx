@@ -10,15 +10,11 @@ import {
   Send,
   Archive,
   AlertCircle,
-  Clock,
-  CheckCircle,
   X,
   Upload,
   Loader2,
   Trash2,
-  Image as ImageIcon,
   ExternalLink,
-  Sparkles,
 } from 'lucide-react';
 
 interface ProductItem {
