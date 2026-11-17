@@ -21,6 +21,8 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<User>;
+  loginWithGoogle: (payload: { credential?: string; email?: string; displayName?: string; photoUrl?: string }) => Promise<User>;
+  getGoogleOAuthUrl: () => Promise<string | null>;
   register: (email: string, password: string, displayName: string) => Promise<User>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -56,6 +58,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return res.data;
   };
 
+  const loginWithGoogle = async (payload: {
+    credential?: string;
+    email?: string;
+    displayName?: string;
+    photoUrl?: string;
+  }): Promise<User> => {
+    const res = await apiFetch<{ data: User }>('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    setUser(res.data);
+    return res.data;
+  };
+
+  const getGoogleOAuthUrl = async (): Promise<string | null> => {
+    try {
+      const res = await apiFetch<{ data: { url: string | null; isConfigured: boolean } }>('/auth/google/url');
+      return res.data.url;
+    } catch {
+      return null;
+    }
+  };
+
   const register = async (email: string, password: string, displayName: string): Promise<User> => {
     const res = await apiFetch<{ data: User }>('/auth/register', {
       method: 'POST',
@@ -74,7 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithGoogle, getGoogleOAuthUrl, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

@@ -29,6 +29,31 @@ function clearAuthCookies(res) {
     res.clearCookie('ekraf_at', { httpOnly: true, secure: isSecure, sameSite: 'lax' });
     res.clearCookie('ekraf_rt', { httpOnly: true, secure: isSecure, sameSite: 'lax', path: '/api/v1/auth' });
 }
+async function createSessionAndSetCookies(res, user, userAgent) {
+    const familyId = randomUUID();
+    const sessionId = randomUUID();
+    const rawRefreshToken = randomUUID() + '.' + Date.now();
+    const tokenHash = hashToken(rawRefreshToken);
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await prisma.authSession.create({
+        data: {
+            id: sessionId,
+            userId: user.id,
+            familyId,
+            refreshTokenHash: tokenHash,
+            expiresAt,
+            userAgent,
+        },
+    });
+    await prisma.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: new Date() },
+    });
+    const accessToken = signAccessToken({ userId: user.id, role: user.role });
+    const refreshToken = signRefreshToken({ userId: user.id, sessionId, familyId });
+    setAuthCookies(res, accessToken, refreshToken);
+    return { accessToken, refreshToken };
+}
 // POST /register
 authRouter.post('/register', async (req, res, next) => {
     try {
@@ -142,29 +167,252 @@ authRouter.post('/login', async (req, res, next) => {
                 status: 401,
             });
         }
-        // Create new AuthSession
-        const familyId = randomUUID();
-        const sessionId = randomUUID();
-        const rawRefreshToken = randomUUID() + '.' + Date.now();
-        const tokenHash = hashToken(rawRefreshToken);
-        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-        await prisma.authSession.create({
+        await createSessionAndSetCookies(res, user, req.headers['user-agent']);
+        return res.json({
             data: {
-                id: sessionId,
-                userId: user.id,
-                familyId,
-                refreshTokenHash: tokenHash,
-                expiresAt,
-                userAgent: req.headers['user-agent'],
+                id: user.id,
+                email: user.email,
+                role: user.role,
+                profile: user.profile,
             },
         });
-        await prisma.user.update({
-            where: { id: user.id },
-            data: { lastLoginAt: new Date() },
+    }
+    catch (err) {
+        next(err);
+    }
+});
+// GET /google/config
+authRouter.get('/google/config', (_req, res) => {
+    const clientId = process.env.GOOGLE_CLIENT_ID || null;
+    res.json({
+        data: {
+            clientId,
+            isConfigured: Boolean(clientId),
+        },
+    });
+});
+// GET /google/url
+authRouter.get('/google/url', (req, res) => {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) {
+        return res.json({
+            data: {
+                url: null,
+                isConfigured: false,
+                message: 'GOOGLE_CLIENT_ID belum dikonfigurasi di server environment.',
+            },
         });
-        const accessToken = signAccessToken({ userId: user.id, role: user.role });
-        const refreshToken = signRefreshToken({ userId: user.id, sessionId, familyId });
-        setAuthCookies(res, accessToken, refreshToken);
+    }
+    const host = req.get('host') || '127.0.0.1:4000';
+    const protocol = req.protocol || 'http';
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${protocol}://${host}/api/v1/auth/google/callback`;
+    const scope = encodeURIComponent('openid email profile');
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=select_account`;
+    return res.json({
+        data: {
+            url,
+            isConfigured: true,
+        },
+    });
+});
+// GET /google/callback
+authRouter.get('/google/callback', async (req, res, next) => {
+    try {
+        const code = req.query.code;
+        const error = req.query.error;
+        const clientId = process.env.GOOGLE_CLIENT_ID;
+        const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+        if (error || !code) {
+            return res.redirect(`/login?error=${encodeURIComponent(error || 'Autentikasi Google dibatalkan.')}`);
+        }
+        if (!clientId || !clientSecret) {
+            return res.redirect('/login?error=Google+OAuth+belum+dikonfigurasi+lengkap+di+server');
+        }
+        const host = req.get('host') || '127.0.0.1:4000';
+        const protocol = req.protocol || 'http';
+        const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${protocol}://${host}/api/v1/auth/google/callback`;
+        // Exchange code for token
+        const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                code,
+                client_id: clientId,
+                client_secret: clientSecret,
+                redirect_uri: redirectUri,
+                grant_type: 'authorization_code',
+            }),
+        });
+        if (!tokenRes.ok) {
+            return res.redirect('/login?error=Gagal+menukar+kode+otorisasi+Google');
+        }
+        const tokenData = (await tokenRes.json());
+        const accessToken = tokenData.access_token;
+        const idToken = tokenData.id_token;
+        let email = '';
+        let displayName = '';
+        let picture = null;
+        if (accessToken) {
+            const userRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: `Bearer ${accessToken}` },
+            });
+            if (userRes.ok) {
+                const userData = (await userRes.json());
+                email = userData.email;
+                displayName = userData.name;
+                picture = userData.picture || null;
+            }
+        }
+        if (!email && idToken) {
+            const parts = idToken.split('.');
+            if (parts.length === 3) {
+                const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'));
+                email = payload.email;
+                displayName = payload.name;
+                picture = payload.picture || null;
+            }
+        }
+        if (!email) {
+            return res.redirect('/login?error=Email+Google+tidak+ditemukan');
+        }
+        const normalizedEmail = email.trim().toLowerCase();
+        let user = await prisma.user.findUnique({
+            where: { email: normalizedEmail },
+            include: { profile: true },
+        });
+        if (!user) {
+            const dummyHash = await bcrypt.hash(randomUUID() + Date.now(), 10);
+            user = await prisma.user.create({
+                data: {
+                    email: normalizedEmail,
+                    passwordHash: dummyHash,
+                    role: 'USER',
+                    profile: {
+                        create: {
+                            displayName: displayName || normalizedEmail.split('@')[0],
+                            photoPath: picture,
+                        },
+                    },
+                },
+                include: { profile: true },
+            });
+        }
+        else if (!user.isActive) {
+            return res.redirect('/login?error=Akun+pengguna+telah+dinonaktifkan');
+        }
+        else if (!user.profile) {
+            await prisma.userProfile.create({
+                data: {
+                    userId: user.id,
+                    displayName: displayName || user.email.split('@')[0],
+                    photoPath: picture,
+                },
+            });
+            user = await prisma.user.findUnique({
+                where: { id: user.id },
+                include: { profile: true },
+            });
+        }
+        await createSessionAndSetCookies(res, user, req.headers['user-agent']);
+        return res.redirect(user.role === 'ADMIN' ? '/admin' : '/dashboard/profile');
+    }
+    catch (err) {
+        next(err);
+    }
+});
+// POST /google
+authRouter.post('/google', async (req, res, next) => {
+    try {
+        const { credential, email, displayName, photoUrl } = req.body;
+        let resolvedEmail = '';
+        let resolvedName = '';
+        let resolvedPicture = null;
+        if (credential && typeof credential === 'string') {
+            try {
+                const tokenInfoRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+                if (tokenInfoRes.ok) {
+                    const info = (await tokenInfoRes.json());
+                    resolvedEmail = info.email;
+                    resolvedName = info.name;
+                    resolvedPicture = info.picture || null;
+                }
+                else {
+                    const parts = credential.split('.');
+                    if (parts.length === 3) {
+                        const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'));
+                        resolvedEmail = payload.email;
+                        resolvedName = payload.name;
+                        resolvedPicture = payload.picture || null;
+                    }
+                }
+            }
+            catch {
+                const parts = credential.split('.');
+                if (parts.length === 3) {
+                    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'));
+                    resolvedEmail = payload.email;
+                    resolvedName = payload.name;
+                    resolvedPicture = payload.picture || null;
+                }
+            }
+        }
+        if (!resolvedEmail && email) {
+            resolvedEmail = String(email).trim().toLowerCase();
+            resolvedName = String(displayName || resolvedEmail.split('@')[0]).trim();
+            resolvedPicture = photoUrl || null;
+        }
+        if (!resolvedEmail) {
+            throw new AppError({
+                code: 'VALIDATION_FAILED',
+                message: 'Akun Google tidak valid. Informasi email tidak ditemukan.',
+                status: 422,
+            });
+        }
+        const normalizedEmail = resolvedEmail.trim().toLowerCase();
+        let user = await prisma.user.findUnique({
+            where: { email: normalizedEmail },
+            include: { profile: true },
+        });
+        if (!user) {
+            const dummyHash = await bcrypt.hash(randomUUID() + Date.now(), 10);
+            user = await prisma.user.create({
+                data: {
+                    email: normalizedEmail,
+                    passwordHash: dummyHash,
+                    role: 'USER',
+                    profile: {
+                        create: {
+                            displayName: resolvedName || normalizedEmail.split('@')[0],
+                            photoPath: resolvedPicture,
+                        },
+                    },
+                },
+                include: { profile: true },
+            });
+        }
+        else {
+            if (!user.isActive) {
+                throw new AppError({
+                    code: 'UNAUTHENTICATED',
+                    message: 'Akun pengguna telah dinonaktifkan.',
+                    status: 401,
+                });
+            }
+            if (!user.profile) {
+                await prisma.userProfile.create({
+                    data: {
+                        userId: user.id,
+                        displayName: resolvedName || user.email.split('@')[0],
+                        photoPath: resolvedPicture,
+                    },
+                });
+                user = await prisma.user.findUnique({
+                    where: { id: user.id },
+                    include: { profile: true },
+                });
+            }
+        }
+        await createSessionAndSetCookies(res, user, req.headers['user-agent']);
         return res.json({
             data: {
                 id: user.id,

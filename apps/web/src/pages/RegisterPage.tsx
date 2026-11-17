@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
 import { Sparkles, Lock, Mail, User, AlertCircle, Loader2 } from 'lucide-react';
+import { GoogleAuthButton } from '../components/GoogleAuthButton.js';
 
 export const RegisterPage: React.FC = () => {
   const { register } = useAuth();
@@ -54,6 +55,19 @@ export const RegisterPage: React.FC = () => {
             <span>{error}</span>
           </div>
         )}
+
+        {/* Google OAuth Register Option */}
+        <div className="space-y-3">
+          <GoogleAuthButton mode="register" />
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200" />
+            </div>
+            <div className="relative flex justify-center text-xs">
+              <span className="px-3 bg-white text-slate-400 font-medium">atau daftar dengan email</span>
+            </div>
+          </div>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
