@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
-import { Loader2, X, AlertCircle, ShieldCheck, UserCheck } from 'lucide-react';
+import { Loader2, X, AlertCircle, ShieldCheck, UserCheck, ExternalLink } from 'lucide-react';
 
 interface GoogleAuthButtonProps {
   mode?: 'login' | 'register';
@@ -19,6 +19,7 @@ export const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
 
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [oauthUrl, setOauthUrl] = useState<string | null>(null);
   const [customEmail, setCustomEmail] = useState('');
   const [customName, setCustomName] = useState('');
   const [modalError, setModalError] = useState<string | null>(null);
@@ -28,20 +29,19 @@ export const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
     setModalError(null);
 
     try {
-      // Check if real Google OAuth URL is available from backend
-      const oauthUrl = await getGoogleOAuthUrl();
-      if (oauthUrl) {
-        // Redirect directly to official Google OAuth consent screen
-        window.location.href = oauthUrl;
-        return;
-      }
-
-      // If GOOGLE_CLIENT_ID not configured yet, open quick Google sign-in dialog
+      const url = await getGoogleOAuthUrl();
+      setOauthUrl(url);
       setShowModal(true);
     } catch {
       setShowModal(true);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOfficialRedirect = () => {
+    if (oauthUrl) {
+      window.location.href = oauthUrl;
     }
   };
 
@@ -174,6 +174,25 @@ export const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
               <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-600 flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 text-red-500 mt-0.5" />
                 <span>{modalError}</span>
+              </div>
+            )}
+
+            {oauthUrl && (
+              <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-200/70 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
+                  <ExternalLink className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Google Cloud OAuth 2.0 (Resmi)</span>
+                </div>
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  Masuk melalui dialog resmi Google (<code className="bg-white/80 px-1 py-0.5 rounded text-[10px]">accounts.google.com</code>).
+                </p>
+                <button
+                  type="button"
+                  onClick={handleOfficialRedirect}
+                  className="w-full py-2 px-3 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs transition flex items-center justify-center gap-2 shadow-sm"
+                >
+                  <span>Buka Akun Google Resmi</span>
+                </button>
               </div>
             )}
 

@@ -239,19 +239,22 @@ authRouter.get('/google/url', (req: Request, res: Response) => {
     });
   }
 
+  const requestedRedirectUri = req.query.redirect_uri as string;
   const host = req.get('host') || '127.0.0.1:4000';
   const protocol = req.protocol || 'http';
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${protocol}://${host}/api/v1/auth/google/callback`;
+  const redirectUri = requestedRedirectUri || process.env.GOOGLE_REDIRECT_URI || `${protocol}://${host}/api/v1/auth/google/callback`;
   const scope = encodeURIComponent('openid email profile');
+  const state = encodeURIComponent(redirectUri);
   const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(
     clientId
   )}&redirect_uri=${encodeURIComponent(
     redirectUri
-  )}&response_type=code&scope=${scope}&access_type=offline&prompt=select_account`;
+  )}&response_type=code&scope=${scope}&access_type=offline&prompt=select_account&state=${state}`;
 
   return res.json({
     data: {
       url,
+      redirectUri,
       isConfigured: true,
     },
   });
@@ -273,9 +276,10 @@ authRouter.get('/google/callback', async (req: Request, res: Response, next: Nex
       return res.redirect('/login?error=Google+OAuth+belum+dikonfigurasi+lengkap+di+server');
     }
 
+    const state = req.query.state as string;
     const host = req.get('host') || '127.0.0.1:4000';
     const protocol = req.protocol || 'http';
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${protocol}://${host}/api/v1/auth/google/callback`;
+    const redirectUri = (state ? decodeURIComponent(state) : null) || process.env.GOOGLE_REDIRECT_URI || `${protocol}://${host}/api/v1/auth/google/callback`;
 
     // Exchange code for token
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
