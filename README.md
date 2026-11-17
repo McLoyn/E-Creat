@@ -1,6 +1,6 @@
 # Ekraf HUB V0.1 — Platform Ekosistem Ekonomi Kreatif Tuban
 
-Ekraf HUB V0.1 adalah aplikasi prototipe fungsional terintegrasi untuk ekosistem ekonomi kreatif di Kabupaten Tuban (inisiatif komunitas independen oleh **Tuban Creative Hub**).
+Ekraf HUB V0.1 adalah aplikasi prototipe fungsional terintegrasi untuk ekosistem ekonomi kreatif di Kabupaten Tuban (inisiatif komunitas independen oleh **Tuban Creative Hub**)
 
 ---
 
