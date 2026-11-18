@@ -2,29 +2,43 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../db.js';
 import { AppError } from './error.js';
-
-const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'ekraf_access_secret_super_secure_key_12345';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'ekraf_refresh_secret_super_secure_key_67890';
+import { envConfig } from '../utils/env.js';
 
 export interface TokenPayload {
   userId: string;
   role: string;
 }
 
-export function signAccessToken(payload: TokenPayload): string {
-  return jwt.sign(payload, JWT_ACCESS_SECRET, { expiresIn: '15m' });
+export interface RefreshTokenPayload {
+  userId: string;
+  sessionId: string;
+  familyId: string;
 }
 
-export function signRefreshToken(payload: { userId: string; sessionId: string; familyId: string }): string {
-  return jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: '7d' });
+export function signAccessToken(payload: TokenPayload): string {
+  return jwt.sign(payload, envConfig.jwtAccessSecret, {
+    algorithm: 'HS256',
+    expiresIn: '15m',
+  });
+}
+
+export function signRefreshToken(payload: RefreshTokenPayload): string {
+  return jwt.sign(payload, envConfig.jwtRefreshSecret, {
+    algorithm: 'HS256',
+    expiresIn: '7d',
+  });
 }
 
 export function verifyAccessToken(token: string): TokenPayload {
-  return jwt.verify(token, JWT_ACCESS_SECRET) as TokenPayload;
+  return jwt.verify(token, envConfig.jwtAccessSecret, {
+    algorithms: ['HS256'],
+  }) as TokenPayload;
 }
 
-export function verifyRefreshToken(token: string): { userId: string; sessionId: string; familyId: string } {
-  return jwt.verify(token, JWT_REFRESH_SECRET) as { userId: string; sessionId: string; familyId: string };
+export function verifyRefreshToken(token: string): RefreshTokenPayload {
+  return jwt.verify(token, envConfig.jwtRefreshSecret, {
+    algorithms: ['HS256'],
+  }) as RefreshTokenPayload;
 }
 
 declare global {
@@ -61,8 +75,8 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
       req.user = user;
     }
     next();
-  } catch (err) {
-    // Expired or invalid token, continue without user
+  } catch (_err) {
+    // Expired or invalid token: continue as guest
     next();
   }
 }

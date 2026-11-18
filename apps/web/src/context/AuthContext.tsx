@@ -21,7 +21,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<User>;
-  loginWithGoogle: (payload: { credential?: string; email?: string; displayName?: string; photoUrl?: string }) => Promise<User>;
+  loginWithGoogleCredential: (credential: string) => Promise<User>;
   getGoogleOAuthUrl: () => Promise<string | null>;
   register: (email: string, password: string, displayName: string) => Promise<User>;
   logout: () => Promise<void>;
@@ -58,15 +58,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return res.data;
   };
 
-  const loginWithGoogle = async (payload: {
-    credential?: string;
-    email?: string;
-    displayName?: string;
-    photoUrl?: string;
-  }): Promise<User> => {
+  const loginWithGoogleCredential = async (credential: string): Promise<User> => {
     const res = await apiFetch<{ data: User }>('/auth/google', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ credential }),
     });
     setUser(res.data);
     return res.data;
@@ -99,7 +94,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, loginWithGoogle, getGoogleOAuthUrl, register, logout, refreshUser }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        loginWithGoogleCredential,
+        getGoogleOAuthUrl,
+        register,
+        logout,
+        refreshUser,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

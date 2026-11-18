@@ -1,10 +1,16 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto, { randomUUID } from 'crypto';
+import { OAuth2Client } from 'google-auth-library';
 import { prisma } from '../db.js';
 import { Prisma } from '@prisma/client';
 import { AppError } from '../middlewares/error.js';
-import { signAccessToken, signRefreshToken, verifyRefreshToken, requireAuth } from '../middlewares/auth.js';
+import {
+  signAccessToken,
+  signRefreshToken,
+  verifyRefreshToken,
+} from '../middlewares/auth.js';
+import { envConfig } from '../utils/env.js';
 
 export const authRouter = Router();
 
@@ -13,18 +19,17 @@ function hashToken(token: string): string {
 }
 
 function setAuthCookies(res: Response, accessToken: string, refreshToken: string) {
-  const isSecure = process.env.COOKIE_SECURE === 'true';
-
   res.cookie('ekraf_at', accessToken, {
     httpOnly: true,
-    secure: isSecure,
+    secure: envConfig.cookieSecure,
     sameSite: 'lax',
+    path: '/',
     maxAge: 15 * 60 * 1000, // 15 min
   });
 
   res.cookie('ekraf_rt', refreshToken, {
     httpOnly: true,
-    secure: isSecure,
+    secure: envConfig.cookieSecure,
     sameSite: 'lax',
     path: '/api/v1/auth',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
@@ -32,9 +37,18 @@ function setAuthCookies(res: Response, accessToken: string, refreshToken: string
 }
 
 function clearAuthCookies(res: Response) {
-  const isSecure = process.env.COOKIE_SECURE === 'true';
-  res.clearCookie('ekraf_at', { httpOnly: true, secure: isSecure, sameSite: 'lax' });
-  res.clearCookie('ekraf_rt', { httpOnly: true, secure: isSecure, sameSite: 'lax', path: '/api/v1/auth' });
+  res.clearCookie('ekraf_at', {
+    httpOnly: true,
+    secure: envConfig.cookieSecure,
+    sameSite: 'lax',
+    path: '/',
+  });
+  res.clearCookie('ekraf_rt', {
+    httpOnly: true,
+    secure: envConfig.cookieSecure,
+    sameSite: 'lax',
+    path: '/api/v1/auth',
+  });
 }
 
 async function createSessionAndSetCookies(
@@ -76,7 +90,7 @@ authRouter.post('/register', async (req: Request, res: Response, next: NextFunct
   try {
     const { email, password, displayName } = req.body;
 
-    // Reject unknown properties (like role) -> 422
+    // Strict protection: Reject unknown privilege fields
     if ('role' in req.body) {
       throw new AppError({
         code: 'VALIDATION_FAILED',
@@ -101,7 +115,7 @@ authRouter.post('/register', async (req: Request, res: Response, next: NextFunct
       });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail = String(email).trim().toLowerCase();
     const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (existing) {
       throw new AppError({
@@ -123,7 +137,7 @@ authRouter.post('/register', async (req: Request, res: Response, next: NextFunct
           role: 'USER',
           profile: {
             create: {
-              displayName: displayName.trim(),
+              displayName: String(displayName).trim(),
             },
           },
         },
@@ -217,7 +231,7 @@ authRouter.post('/login', async (req: Request, res: Response, next: NextFunction
 
 // GET /google/config
 authRouter.get('/google/config', (_req: Request, res: Response) => {
-  const clientId = process.env.GOOGLE_CLIENT_ID || null;
+  const clientId = envConfig.googleClientId || null;
   res.json({
     data: {
       clientId,
@@ -226,30 +240,40 @@ authRouter.get('/google/config', (_req: Request, res: Response) => {
   });
 });
 
-// GET /google/url
-authRouter.get('/google/url', (req: Request, res: Response) => {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  if (!clientId) {
-    return res.json({
+// GET /google/url (AUTH-01, AUTH-02, AUTH-03)
+authRouter.get('/google/url', (_req: Request, res: Response) => {
+  const clientId = envConfig.googleClientId;
+  const redirectUri = envConfig.googleRedirectUri;
+
+  if (!clientId || !redirectUri) {
+    return res.status(503).json({
       data: {
         url: null,
         isConfigured: false,
-        message: 'GOOGLE_CLIENT_ID belum dikonfigurasi di server environment.',
+        message: 'Google OAuth belum dikonfigurasi lengkap di server environment (GOOGLE_CLIENT_ID atau GOOGLE_REDIRECT_URI).',
       },
     });
   }
 
-  const requestedRedirectUri = req.query.redirect_uri as string;
-  const host = req.get('host') || '127.0.0.1:4000';
-  const protocol = req.protocol || 'http';
-  const redirectUri = requestedRedirectUri || process.env.GOOGLE_REDIRECT_URI || `${protocol}://${host}/api/v1/auth/google/callback`;
+  // Cryptographically secure state with browser cookie binding (anti-replay & anti-CSRF)
+  const state = crypto.randomBytes(32).toString('hex');
+
+  res.cookie('ekraf_oauth_state', state, {
+    httpOnly: true,
+    secure: envConfig.cookieSecure,
+    sameSite: 'lax',
+    path: '/api/v1/auth',
+    maxAge: 5 * 60 * 1000, // 5 minutes TTL
+  });
+
   const scope = encodeURIComponent('openid email profile');
-  const state = encodeURIComponent(redirectUri);
   const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(
     clientId
   )}&redirect_uri=${encodeURIComponent(
     redirectUri
-  )}&response_type=code&scope=${scope}&access_type=offline&prompt=select_account&state=${state}`;
+  )}&response_type=code&scope=${scope}&access_type=offline&prompt=select_account&state=${encodeURIComponent(
+    state
+  )}`;
 
   return res.json({
     data: {
@@ -260,85 +284,162 @@ authRouter.get('/google/url', (req: Request, res: Response) => {
   });
 });
 
-// GET /google/callback
+// Helper function to cryptographically verify Google ID Token
+export async function verifyGoogleIdToken(idToken: string): Promise<{
+  sub: string;
+  email: string;
+  name?: string;
+  picture?: string;
+}> {
+  const clientId = envConfig.googleClientId;
+  if (!clientId) {
+    throw new AppError({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'GOOGLE_CLIENT_ID belum dikonfigurasi di server.',
+      status: 503,
+    });
+  }
+
+  const client = new OAuth2Client(clientId);
+  let ticket;
+  try {
+    ticket = await client.verifyIdToken({
+      idToken,
+      audience: clientId,
+    });
+  } catch (err: any) {
+    throw new AppError({
+      code: 'UNAUTHENTICATED',
+      message: `Verifikasi cryptographic Google ID token gagal: ${err.message}`,
+      status: 401,
+    });
+  }
+
+  const payload = ticket.getPayload();
+  if (!payload) {
+    throw new AppError({
+      code: 'UNAUTHENTICATED',
+      message: 'Payload Google ID token kosong.',
+      status: 401,
+    });
+  }
+
+  // Validate audience
+  if (payload.aud !== clientId) {
+    throw new AppError({
+      code: 'UNAUTHENTICATED',
+      message: 'Audience Google token tidak cocok.',
+      status: 401,
+    });
+  }
+
+  // Validate issuer
+  const validIssuers = ['accounts.google.com', 'https://accounts.google.com'];
+  if (!payload.iss || !validIssuers.includes(payload.iss)) {
+    throw new AppError({
+      code: 'UNAUTHENTICATED',
+      message: 'Issuer Google token tidak valid.',
+      status: 401,
+    });
+  }
+
+  // Validate expiry
+  const nowInSec = Math.floor(Date.now() / 1000);
+  if (payload.exp && payload.exp < nowInSec) {
+    throw new AppError({
+      code: 'UNAUTHENTICATED',
+      message: 'Google token telah kedaluwarsa.',
+      status: 401,
+    });
+  }
+
+  // Validate email verified (AUTH-13)
+  if (!payload.email_verified) {
+    throw new AppError({
+      code: 'UNAUTHENTICATED',
+      message: 'Alamat email Google belum diverifikasi oleh Google.',
+      status: 401,
+    });
+  }
+
+  if (!payload.email) {
+    throw new AppError({
+      code: 'UNAUTHENTICATED',
+      message: 'Email tidak ditemukan dalam klaim Google ID token.',
+      status: 401,
+    });
+  }
+
+  return {
+    sub: payload.sub,
+    email: payload.email,
+    name: payload.name,
+    picture: payload.picture,
+  };
+}
+
+// GET /google/callback (AUTH-04 to AUTH-16)
 authRouter.get('/google/callback', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const code = req.query.code as string;
     const error = req.query.error as string;
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const state = req.query.state as string;
+
+    const clientId = envConfig.googleClientId;
+    const clientSecret = envConfig.googleClientSecret;
+    const redirectUri = envConfig.googleRedirectUri;
+
+    // Check configuration
+    if (!clientId || !clientSecret || !redirectUri) {
+      return res.redirect('/login?error=Google+OAuth+belum+dikonfigurasi+lengkap+di+server');
+    }
 
     if (error || !code) {
       return res.redirect(`/login?error=${encodeURIComponent(error || 'Autentikasi Google dibatalkan.')}`);
     }
 
-    if (!clientId || !clientSecret) {
-      return res.redirect('/login?error=Google+OAuth+belum+dikonfigurasi+lengkap+di+server');
-    }
+    // Validate state from cookie (AUTH-05, AUTH-06, AUTH-07)
+    const storedState = req.cookies?.ekraf_oauth_state;
 
-    const state = req.query.state as string;
-    const host = req.get('host') || '127.0.0.1:4000';
-    const protocol = req.protocol || 'http';
-    const redirectUri = (state ? decodeURIComponent(state) : null) || process.env.GOOGLE_REDIRECT_URI || `${protocol}://${host}/api/v1/auth/google/callback`;
-
-    // Exchange code for token
-    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code,
-        client_id: clientId,
-        client_secret: clientSecret,
-        redirect_uri: redirectUri,
-        grant_type: 'authorization_code',
-      }),
+    // Immediately clear state cookie (single use, anti-replay)
+    res.clearCookie('ekraf_oauth_state', {
+      httpOnly: true,
+      secure: envConfig.cookieSecure,
+      sameSite: 'lax',
+      path: '/api/v1/auth',
     });
 
-    if (!tokenRes.ok) {
+    if (!storedState || !state || storedState !== state) {
+      return res.redirect('/login?error=Sesi+OAuth+state+tidak+valid+atau+kedaluwarsa');
+    }
+
+    // Exchange authorization code for tokens
+    const client = new OAuth2Client(clientId, clientSecret, redirectUri);
+    let idToken: string | null = null;
+
+    try {
+      const { tokens } = await client.getToken(code);
+      idToken = tokens.id_token || null;
+    } catch (_err) {
       return res.redirect('/login?error=Gagal+menukar+kode+otorisasi+Google');
     }
 
-    const tokenData = (await tokenRes.json()) as any;
-    const accessToken = tokenData.access_token;
-    const idToken = tokenData.id_token;
-
-    let email = '';
-    let displayName = '';
-    let picture: string | null = null;
-
-    if (accessToken) {
-      const userRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      if (userRes.ok) {
-        const userData = (await userRes.json()) as any;
-        email = userData.email;
-        displayName = userData.name;
-        picture = userData.picture || null;
-      }
+    if (!idToken) {
+      return res.redirect('/login?error=ID+token+Google+tidak+ditemukan');
     }
 
-    if (!email && idToken) {
-      const parts = idToken.split('.');
-      if (parts.length === 3) {
-        const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'));
-        email = payload.email;
-        displayName = payload.name;
-        picture = payload.picture || null;
-      }
-    }
+    // Cryptographically verify ID token
+    const verifiedUser = await verifyGoogleIdToken(idToken);
+    const normalizedEmail = verifiedUser.email.trim().toLowerCase();
 
-    if (!email) {
-      return res.redirect('/login?error=Email+Google+tidak+ditemukan');
-    }
-
-    const normalizedEmail = email.trim().toLowerCase();
+    // Account Lookup & Creation (AUTH-14, AUTH-15, AUTH-16)
     let user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
       include: { profile: true },
     });
 
     if (!user) {
+      // New user gets USER role (AUTH-14)
       const dummyHash = await bcrypt.hash(randomUUID() + Date.now(), 10);
       user = await prisma.user.create({
         data: {
@@ -347,96 +448,69 @@ authRouter.get('/google/callback', async (req: Request, res: Response, next: Nex
           role: 'USER',
           profile: {
             create: {
-              displayName: displayName || normalizedEmail.split('@')[0],
-              photoPath: picture,
+              displayName: verifiedUser.name || normalizedEmail.split('@')[0],
+              photoPath: verifiedUser.picture || null,
             },
           },
         },
         include: { profile: true },
       });
-    } else if (!user.isActive) {
-      return res.redirect('/login?error=Akun+pengguna+telah+dinonaktifkan');
-    } else if (!user.profile) {
-      await prisma.userProfile.create({
-        data: {
-          userId: user.id,
-          displayName: displayName || user.email.split('@')[0],
-          photoPath: picture,
-        },
-      });
-      user = await prisma.user.findUnique({
-        where: { id: user.id },
-        include: { profile: true },
-      });
+    } else {
+      // Existing user: check if inactive (AUTH-16)
+      if (!user.isActive) {
+        return res.redirect('/login?error=Akun+pengguna+telah+dinonaktifkan');
+      }
+
+      // Existing role is preserved! (AUTH-15: admin remains admin, user remains user)
+      if (!user.profile) {
+        await prisma.userProfile.create({
+          data: {
+            userId: user.id,
+            displayName: verifiedUser.name || user.email.split('@')[0],
+            photoPath: verifiedUser.picture || null,
+          },
+        });
+        user = await prisma.user.findUnique({
+          where: { id: user.id },
+          include: { profile: true },
+        });
+      }
     }
 
     await createSessionAndSetCookies(res, user!, req.headers['user-agent']);
     return res.redirect(user!.role === 'ADMIN' ? '/admin' : '/dashboard/profile');
-  } catch (err) {
-    next(err);
+  } catch (err: any) {
+    const errorMsg = err?.message || 'Terjadi kesalahan saat memproses login Google';
+    return res.redirect(`/login?error=${encodeURIComponent(errorMsg)}`);
   }
 });
 
-// POST /google
+// POST /google (AUTH-09 to AUTH-17: Strict cryptographic ID token verification only, rejects arbitrary client body identity)
 authRouter.post('/google', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { credential, email, displayName, photoUrl } = req.body;
+    const { credential, idToken } = req.body;
+    const tokenToVerify = credential || idToken;
 
-    let resolvedEmail = '';
-    let resolvedName = '';
-    let resolvedPicture: string | null = null;
-
-    if (credential && typeof credential === 'string') {
-      try {
-        const tokenInfoRes = await fetch(
-          `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`
-        );
-        if (tokenInfoRes.ok) {
-          const info = (await tokenInfoRes.json()) as any;
-          resolvedEmail = info.email;
-          resolvedName = info.name;
-          resolvedPicture = info.picture || null;
-        } else {
-          const parts = credential.split('.');
-          if (parts.length === 3) {
-            const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'));
-            resolvedEmail = payload.email;
-            resolvedName = payload.name;
-            resolvedPicture = payload.picture || null;
-          }
-        }
-      } catch {
-        const parts = credential.split('.');
-        if (parts.length === 3) {
-          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'));
-          resolvedEmail = payload.email;
-          resolvedName = payload.name;
-          resolvedPicture = payload.picture || null;
-        }
-      }
-    }
-
-    if (!resolvedEmail && email) {
-      resolvedEmail = String(email).trim().toLowerCase();
-      resolvedName = String(displayName || resolvedEmail.split('@')[0]).trim();
-      resolvedPicture = photoUrl || null;
-    }
-
-    if (!resolvedEmail) {
+    if (!tokenToVerify || typeof tokenToVerify !== 'string') {
       throw new AppError({
         code: 'VALIDATION_FAILED',
-        message: 'Akun Google tidak valid. Informasi email tidak ditemukan.',
+        message: 'Kredensial ID token Google wajib disediakan dalam request body.',
         status: 422,
       });
     }
 
-    const normalizedEmail = resolvedEmail.trim().toLowerCase();
+    // Cryptographically verify ID token
+    const verifiedUser = await verifyGoogleIdToken(tokenToVerify);
+    const normalizedEmail = verifiedUser.email.trim().toLowerCase();
+
+    // Look up or create account
     let user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
       include: { profile: true },
     });
 
     if (!user) {
+      // New user: role must be USER (AUTH-14)
       const dummyHash = await bcrypt.hash(randomUUID() + Date.now(), 10);
       user = await prisma.user.create({
         data: {
@@ -445,8 +519,8 @@ authRouter.post('/google', async (req: Request, res: Response, next: NextFunctio
           role: 'USER',
           profile: {
             create: {
-              displayName: resolvedName || normalizedEmail.split('@')[0],
-              photoPath: resolvedPicture,
+              displayName: verifiedUser.name || normalizedEmail.split('@')[0],
+              photoPath: verifiedUser.picture || null,
             },
           },
         },
@@ -460,12 +534,14 @@ authRouter.post('/google', async (req: Request, res: Response, next: NextFunctio
           status: 401,
         });
       }
+
+      // Existing role is preserved (AUTH-15)
       if (!user.profile) {
         await prisma.userProfile.create({
           data: {
             userId: user.id,
-            displayName: resolvedName || user.email.split('@')[0],
-            photoPath: resolvedPicture,
+            displayName: verifiedUser.name || user.email.split('@')[0],
+            photoPath: verifiedUser.picture || null,
           },
         });
         user = await prisma.user.findUnique({
@@ -490,14 +566,14 @@ authRouter.post('/google', async (req: Request, res: Response, next: NextFunctio
   }
 });
 
-// POST /refresh
+// POST /refresh (Atomic rotation & reuse detection)
 authRouter.post('/refresh', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const rawToken = req.cookies?.ekraf_rt;
     if (!rawToken) {
       throw new AppError({
         code: 'UNAUTHENTICATED',
-        message: 'Token refresh tidak ditemukan.',
+        message: 'Token refresh tidak ditemukan dalam cookie.',
         status: 401,
       });
     }
@@ -534,12 +610,12 @@ authRouter.post('/refresh', async (req: Request, res: Response, next: NextFuncti
       clearAuthCookies(res);
       throw new AppError({
         code: 'UNAUTHENTICATED',
-        message: 'Deteksi penggunaan token berulang. Seluruh sesi telah dicabut demi keamanan.',
+        message: 'Deteksi penggunaan token berulang (token reuse). Seluruh sesi telah dicabut demi keamanan.',
         status: 401,
       });
     }
 
-    // Normal rotation: create new session and mark old session replaced
+    // Normal rotation: atomic transaction
     const newSessionId = randomUUID();
     const newRawRefreshToken = randomUUID() + '.' + Date.now();
     const newHash = hashToken(newRawRefreshToken);
@@ -579,7 +655,11 @@ authRouter.post('/refresh', async (req: Request, res: Response, next: NextFuncti
     }
 
     const newAccessToken = signAccessToken({ userId: user.id, role: user.role });
-    const newRefreshToken = signRefreshToken({ userId: user.id, sessionId: newSessionId, familyId: payload.familyId });
+    const newRefreshToken = signRefreshToken({
+      userId: user.id,
+      sessionId: newSessionId,
+      familyId: payload.familyId,
+    });
 
     setAuthCookies(res, newAccessToken, newRefreshToken);
 

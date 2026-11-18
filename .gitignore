@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Polydev Mobile IDE
+.polydev/
+.base/
+
+# Environment files
+.env
+.env*.local
+apps/api/.env
+apps/web/.env
+
+# Build outputs
+dist/
+apps/*/dist/
+
+# Local SQLite databases & uploads
+*.db
+*.db-journal
+dev.db
+uploads/
+apps/api/uploads/
+
+# OS / Editor
+.DS_Store
+*.log

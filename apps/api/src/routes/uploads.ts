@@ -1,31 +1,13 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
-import path from 'path';
-import { randomUUID } from 'crypto';
-import fs from 'fs';
 import { requireAuth } from '../middlewares/auth.js';
 import { AppError } from '../middlewares/error.js';
+import { uploadImage } from '../utils/storage.js';
 
 export const uploadsRouter = Router();
 
-const uploadDir = path.resolve(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase() || '.png';
-    const filename = `${randomUUID()}${ext}`;
-    cb(null, filename);
-  },
-});
-
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 2 * 1024 * 1024, // 2MB
   },
@@ -48,9 +30,9 @@ uploadsRouter.post(
   '/images',
   requireAuth,
   upload.single('file'),
-  (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!req.file) {
+      if (!req.file || !req.file.buffer) {
         throw new AppError({
           code: 'VALIDATION_FAILED',
           message: 'File gambar wajib diunggah.',
@@ -58,13 +40,25 @@ uploadsRouter.post(
         });
       }
 
-      const relativePath = `/uploads/${req.file.filename}`;
+      const folderParam = (req.query.folder as string) || 'general';
+      const folder = ['profiles', 'works', 'products'].includes(folderParam)
+        ? (folderParam as 'profiles' | 'works' | 'products')
+        : 'general';
+
+      const result = await uploadImage(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype,
+        folder
+      );
+
       return res.status(201).json({
         data: {
-          path: relativePath,
-          filename: req.file.filename,
-          size: req.file.size,
-          mimetype: req.file.mimetype,
+          path: result.path,
+          filename: result.filename,
+          size: result.size,
+          mimetype: result.mimetype,
+          provider: result.storageProvider,
         },
       });
     } catch (err) {

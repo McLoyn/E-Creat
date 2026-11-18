@@ -1,10 +1,15 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { prisma } from './db.js';
 import { requestIdMiddleware, errorHandler, AppError } from './middlewares/error.js';
 import { authenticate } from './middlewares/auth.js';
+import { envConfig } from './utils/env.js';
 import { authRouter } from './routes/auth.js';
 import { profileRouter } from './routes/profile.js';
 import { uploadsRouter } from './routes/uploads.js';
@@ -18,38 +23,87 @@ import { adminRouter } from './routes/admin.js';
 
 export const app = express();
 
-const WEB_ORIGIN = process.env.WEB_ORIGIN || 'http://localhost:5173';
+// 1. Security Headers (Helmet)
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // SPA handles frontend scripts/styles
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
 
+// 2. Strict CORS Allowlist
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl) or matching web origin
-      if (!origin || origin === WEB_ORIGIN || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
-        callback(null, true);
-      } else {
-        callback(null, true); // Permissive in prototype for preview
+      // Allow requests with no origin (e.g. mobile native apps, curl, server-to-server)
+      if (!origin) {
+        return callback(null, true);
       }
+
+      // Check against explicit allowlist
+      if (envConfig.webOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // Localhost allowed in development only
+      if (!envConfig.isProduction && (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1'))) {
+        return callback(null, true);
+      }
+
+      return callback(
+        new AppError({
+          code: 'CORS_REJECTED',
+          message: `Akses dari origin ${origin} ditolak oleh kebijakan keamanan CORS.`,
+          status: 403,
+        })
+      );
     },
     credentials: true,
   })
 );
 
+// 3. Rate Limiting for Authentication Endpoints (Brute-Force & Credential Stuffing Defense)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30, // 30 attempts per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req, _res, next) => {
+    next(
+      new AppError({
+        code: 'TOO_MANY_REQUESTS',
+        message: 'Terlalu banyak percobaan autentikasi. Silakan tunggu 15 menit sebelum mencoba kembali.',
+        status: 429,
+      })
+    );
+  },
+});
+
+app.use('/api/v1/auth/login', authLimiter);
+app.use('/api/v1/auth/register', authLimiter);
+app.use('/api/v1/auth/google', authLimiter);
+
+// 4. Body Parsers & Request Context
 app.use(cookieParser());
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 app.use(requestIdMiddleware);
 app.use(authenticate);
 
-// Serve static uploaded files
+// 5. Local static uploaded files (fallback for dev)
 const uploadDir = path.resolve(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 app.use('/uploads', express.static(uploadDir));
 
-// Health check endpoint
-app.get('/api/v1/health', async (_req, res, next) => {
+// 6. Health check endpoint (verifies DB connectivity & env status)
+app.get('/api/v1/health', async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
     return res.json({
       status: 'ok',
       database: 'connected',
+      environment: envConfig.nodeEnv,
       timestamp: new Date().toISOString(),
     });
   } catch (err: any) {
@@ -57,12 +111,13 @@ app.get('/api/v1/health', async (_req, res, next) => {
       status: 'degraded',
       database: 'disconnected',
       error: err.message,
+      environment: envConfig.nodeEnv,
       timestamp: new Date().toISOString(),
     });
   }
 });
 
-// Mount Routes
+// 7. Mount Application Routes
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/me/profile', profileRouter);
 app.use('/api/v1/uploads', uploadsRouter);
@@ -74,16 +129,14 @@ app.use('/api/v1/products', productsRouter);
 app.use('/api/v1/me/works', creatorWorksRouter);
 app.use('/api/v1/me/products', creatorProductsRouter);
 
-// Admin Routes
+// 8. Admin Routes
 app.use('/api/v1/admin/categories', adminCategoriesRouter);
 app.use('/api/v1/admin/sub-apps', adminSubAppsRouter);
 app.use('/api/v1/admin/creative-profiles', adminCreativeProfilesRouter);
 app.use('/api/v1/admin', adminModerationRouter);
 app.use('/api/v1/admin', adminRouter);
 
-// Serve Web Frontend SPA if built
-import fs from 'fs';
-import { fileURLToPath } from 'url';
+// 9. Serve Web Frontend SPA if built
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webDistPath = path.resolve(__dirname, '../../web/dist');
 if (fs.existsSync(webDistPath)) {
@@ -96,7 +149,7 @@ if (fs.existsSync(webDistPath)) {
   });
 }
 
-// 404 Route Handler for unmatched API endpoints
+// 10. 404 Route Handler for unmatched API endpoints
 app.use((_req, _res, next) => {
   next(
     new AppError({
@@ -107,7 +160,7 @@ app.use((_req, _res, next) => {
   );
 });
 
-// Centralized Error Handler
+// 11. Centralized Error Handler
 app.use(errorHandler);
 
 export default app;
