@@ -76,6 +76,19 @@ export function validateAndLoadConfig(): AppConfig {
   const cookieSecure =
     process.env.COOKIE_SECURE === 'true' || (isProduction && process.env.COOKIE_SECURE !== 'false');
 
+  // Supabase production validation
+  if (isProduction) {
+    if (!process.env.SUPABASE_URL) {
+      throw new Error('Konfigurasi Keamanan Kritis: SUPABASE_URL wajib diisi pada environment production.');
+    }
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('Konfigurasi Keamanan Kritis: SUPABASE_SERVICE_ROLE_KEY wajib diisi pada environment production.');
+    }
+    if (!process.env.SUPABASE_URL.startsWith('https://')) {
+      throw new Error('Konfigurasi Keamanan Kritis: SUPABASE_URL harus menggunakan HTTPS.');
+    }
+  }
+
   if (isProduction) {
   if (!process.env.DATABASE_URL) {
     throw new Error('Konfigurasi Keamanan Kritis: DATABASE_URL wajib diisi pada environment production.');
