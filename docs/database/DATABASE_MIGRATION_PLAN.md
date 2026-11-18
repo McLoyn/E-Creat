@@ -1,21 +1,22 @@
-# EKRAF HUB — Rencana Migrasi Database PostgreSQL Supabase
+# EKRAF HUB — Rencana & Prosedur Migrasi Database PostgreSQL Supabase
 **Dokumen Referensi:** `docs/database/DATABASE_MIGRATION_PLAN.md`  
 **Status:** Siap Eksekusi  
-**Branch:** `fix/backend-foundation-security`
+**Branch:** `feat/supabase-database-storage`  
 
 ---
 
 ## 1. Latar Belakang & Tujuan
-Pada tahap prototipe awal, aplikasi menggunakan SQLite lokal (`dev.db`). Untuk target produksi skala besar, sistem menggunakan **Supabase PostgreSQL**. Dokumen ini menjamin transisi skema yang aman, konsisten, dan tanpa kehilangan data.
+Pada tahap prototipe awal, aplikasi menggunakan SQLite lokal (`dev.db`). Untuk target produksi skala besar, sistem menggunakan **Supabase PostgreSQL**. Dokumen ini menjamin transisi skema yang aman, konsisten, terlacak via Prisma Migrate, dan tanpa kehilangan data.
 
 ---
 
-## 2. Struktur Skema & Sinkronisasi
+## 2. Struktur Skema & Sumber Kebenaran (Single Source of Truth)
 
 ### 2.1 File Acuan Skema
-1. **DDL Supabase Asli:** `docs/supabase_schema.sql`
-2. **Prisma PostgreSQL Production Schema:** `apps/api/prisma/schema.postgresql.prisma`
-3. **Prisma SQLite Local Schema:** `apps/api/prisma/schema.prisma`
+1. **Prisma Canonical Schema (PostgreSQL):** `apps/api/prisma/schema.prisma`
+2. **Prisma Migration Baseline Terlacak:** `apps/api/prisma/migrations/20261118000000_init_supabase_postgresql/migration.sql`
+3. **Prisma SQLite Schema (Khusus Pengujian Offline):** `apps/api/prisma/schema.sqlite.prisma`
+4. **DDL Supabase Asli:** `docs/supabase_schema.sql`
 
 ### 2.2 Sinkronisasi Entitas & Enums
 PostgreSQL menggunakan tipe data native Enum yang diselaraskan dengan Prisma:
@@ -54,42 +55,55 @@ Untuk mendukung pencarian cepat dan pagination direktori hingga puluhan ribu ent
 7. `idx_work_creator_status`: `CreativeWork(creativeProfileId, status)`
 8. `idx_prod_status_published`: `CreativeProduct(status, publishedAt DESC)`
 9. `idx_prod_creator_status`: `CreativeProduct(creativeProfileId, status)`
-10. `idx_session_expires`: `AuthSession(expiresAt)` (Mempercepat cron cleanup sesi kedaluwarsa)
+10. `idx_session_expires`: `AuthSession(expiresAt)` (Mempercepat pembersihan sesi kedaluwarsa)
 
 ---
 
-## 3. Prosedur Eksekusi Migrasi ke Supabase Production
+## 3. Prosedur Eksekusi Migrasi ke Supabase Production (Panduan Pemilik Proyek)
 
-### Langkah 1: Persiapan Koneksi Supabase
+Karena proyek Supabase baru dibuat dalam keadaan kosong, lakukan langkah berikut:
+
+### Langkah 1: Persiapan Variabel Lingkungan di Supabase Dashboard
 Dapatkan Connection String PostgreSQL dari Dashboard Supabase:
-- Buka **Project Settings** > **Database** > **Connection Pooling / Direct Connection**.
-- Simpan nilai ke dalam `.env` production:
+- Buka **Project Settings** > **Database**.
+- Salin connection string:
+  - **Transaction Pooler (Port 6543):** Masukkan ke `DATABASE_URL`
+  - **Direct Connection / Session Mode (Port 5432):** Masukkan ke `DIRECT_URL`
+- Masukkan ke `.env` server backend:
   ```env
-  DATABASE_URL="postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?pgbouncer=true"
-  DIRECT_URL="postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres"
+  DATABASE_URL="postgresql://postgres.[PROJECT-REF]:[DB-PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?pgbouncer=true"
+  DIRECT_URL="postgresql://postgres.[PROJECT-REF]:[DB-PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres"
   ```
 
-### Langkah 2: Eksekusi DDL Schema di Supabase SQL Editor
-1. Buka **SQL Editor** pada Dashboard Supabase.
-2. Salin seluruh isi file `docs/supabase_schema.sql`.
-3. Jalankan query (`Run`).
-4. Verifikasi seluruh tabel, enum, foreign key, dan check constraint berhasil dibuat tanpa error.
-
-### Langkah 3: Sinkronisasi Prisma Client Production
-Jalankan perintah berikut di lingkungan deployment:
+### Langkah 2: Jalankan Migration Prisma (Otomatis & Terlacak)
+Eksekusi migration terlacak dari direktori proyek:
 ```bash
-npx prisma generate --schema=apps/api/prisma/schema.postgresql.prisma
+cd apps/api
+npx prisma migrate deploy --schema=prisma/schema.prisma
+```
+Perintah ini akan secara otomatis:
+1. Membuat tabel `_prisma_migrations` untuk mencatat riwayat migration.
+2. Mengeksekusi DDL `20261118000000_init_supabase_postgresql/migration.sql`.
+3. Membentuk seluruh Enum, Tabel, Index, Foreign Key, dan Business Logic Check Constraints.
+
+*Alternatif Manual (Via Supabase SQL Editor):*
+Jika tidak ingin menjalankan CLI, salin seluruh isi file `docs/supabase_schema.sql` ke dalam **SQL Editor** di Dashboard Supabase lalu klik **Run**.
+
+### Langkah 3: Inisialisasi Klien Prisma (Generate Client)
+```bash
+npx prisma generate --schema=apps/api/prisma/schema.prisma
 ```
 
 ### Langkah 4: Seeding Data Awal (Opsional)
-Untuk menginisialisasi kategori subsektor, akun administrator awal, dan sampel data direktori:
+Untuk menginisialisasi kategori subsektor, tipe sub-apps, kategori karya, dan akun administrator awal:
 ```bash
-npx tsx apps/api/prisma/seed.ts
+SEED_ADMIN_PASSWORD="YourStrongUniqueAdminPassword123!" npx tsx apps/api/prisma/seed.ts
 ```
+*(Catatan: Mode produksi mewajibkan `SEED_ADMIN_PASSWORD` kustom yang kuat; password default ditolak demi keamanan).*
 
 ---
 
 ## 4. Rollback Plan
-Jika terjadi kegagalan atau kendala saat rilis database:
+Jika terjadi kegagalan saat migrasi:
 1. Jalankan script rollback `docs/rollback_w1.sql` yang telah disediakan untuk mengembalikan skema ke kondisi bersih secara aman.
 2. Pulihkan data menggunakan backup snapshot PostgreSQL terbaru (lihat `docs/operations/BACKUP_RECOVERY.md`).

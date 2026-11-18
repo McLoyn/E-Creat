@@ -13,6 +13,7 @@ export interface RefreshTokenPayload {
   userId: string;
   sessionId: string;
   familyId: string;
+  tokenSecret?: string;
 }
 
 export function signAccessToken(payload: TokenPayload): string {

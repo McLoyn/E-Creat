@@ -6,6 +6,11 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('Seeding Ekraf HUB database...');
 
+  const isProduction = process.env.NODE_ENV === 'production';
+  if (isProduction && (!process.env.SEED_ADMIN_PASSWORD || process.env.SEED_ADMIN_PASSWORD === 'AdminPassword123!')) {
+    throw new Error('Keamanan Seed Produksi: SEED_ADMIN_PASSWORD wajib diatur dengan kata sandi unik dan kuat pada mode production.');
+  }
+
   const adminEmail = (process.env.SEED_ADMIN_EMAIL || 'admin@ekraftuban.id').toLowerCase();
   const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'AdminPassword123!';
   const userPassword = process.env.SEED_USER_PASSWORD || 'UserPassword123!';
