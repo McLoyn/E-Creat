@@ -12,11 +12,7 @@ if (envConfig.supabaseUrl && envConfig.supabaseServiceRoleKey) {
   });
 }
 
-export function getSupabaseClient(): SupabaseClient | null {
-  return supabaseClient;
-}
-
-// Magic bytes validation for true file signature verification (anti-MIME spoofing)
+// Magic bytes validation for true file signature verification
 export function validateImageSignature(buffer: Buffer, declaredMime: string): boolean {
   if (buffer.length < 12) return false;
 
@@ -91,7 +87,7 @@ export async function uploadImage(
     });
   }
 
-  // 4. Generate random, unguessable filename (never trust client filename)
+  // 4. Generate random, unguessable filename
   const ext = path.extname(originalFilename).toLowerCase() || (mimetype === 'image/png' ? '.png' : mimetype === 'image/webp' ? '.webp' : '.jpg');
   const filename = `${randomUUID()}${ext}`;
   const objectKey = `${folder}/${filename}`;
@@ -105,10 +101,10 @@ export async function uploadImage(
     });
 
     if (error) {
-      console.error('[Supabase Storage Upload Error]', error.message);
+      console.error('[Supabase Storage Upload Error]', error);
       throw new AppError({
         code: 'STORAGE_ERROR',
-        message: `Gagal mengunggah file ke Supabase Storage: ${error.message}`,
+        message: 'Gagal mengunggah file ke Supabase Storage.',
         status: 502,
         details: error.message,
       });
@@ -125,16 +121,7 @@ export async function uploadImage(
     };
   }
 
-  // 6. Production Safety: Fail-fast if Supabase Storage is missing in production
-  if (envConfig.isProduction) {
-    throw new AppError({
-      code: 'STORAGE_UNAVAILABLE',
-      message: 'Supabase Storage wajib tersedia pada mode production. Fallback penyimpanan disk lokal dilarang.',
-      status: 500,
-    });
-  }
-
-  // 7. Local Disk Storage Fallback (ONLY for development/testing without cloud credentials)
+  // 6. Local Disk Storage Fallback (for development / testing environments without cloud credentials)
   const uploadDir = path.resolve(process.cwd(), 'uploads', folder);
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
@@ -159,34 +146,22 @@ export async function deleteImage(imagePathOrUrl: string): Promise<boolean> {
     // If Supabase Storage URL
     if (supabaseClient && imagePathOrUrl.includes(envConfig.supabaseStorageBucket)) {
       const bucket = envConfig.supabaseStorageBucket;
-      let objectKey: string | null = null;
-      if (imagePathOrUrl.includes(`/${bucket}/`)) {
-        const parts = imagePathOrUrl.split(`/${bucket}/`);
-        if (parts.length > 1) objectKey = parts[1];
-      } else if (imagePathOrUrl.startsWith(`${bucket}/`)) {
-        objectKey = imagePathOrUrl.substring(bucket.length + 1);
-      }
-
-      if (objectKey) {
-        // Sanitize object key against path traversal
-        const cleanKey = path.normalize(objectKey).replace(/^(\.\.[\/\\])+/, '');
-        const { error } = await supabaseClient.storage.from(bucket).remove([cleanKey]);
+      const parts = imagePathOrUrl.split(`${bucket}/`);
+      if (parts.length > 1) {
+        const objectKey = parts[1];
+        const { error } = await supabaseClient.storage.from(bucket).remove([objectKey]);
         if (error) {
-          console.error('[Supabase Storage Delete Error]', error.message);
+          console.error('[Supabase Storage Delete Error]', error);
           return false;
         }
         return true;
       }
     }
 
-    // Local storage path (/uploads/...) - development/test only
+    // If local storage path (/uploads/...)
     if (imagePathOrUrl.startsWith('/uploads/')) {
-      if (envConfig.isProduction) {
-        return false;
-      }
       const relPath = imagePathOrUrl.replace(/^\/uploads\//, '');
-      const safeRelPath = path.normalize(relPath).replace(/^(\.\.[\/\\])+/, '');
-      const fullPath = path.resolve(process.cwd(), 'uploads', safeRelPath);
+      const fullPath = path.resolve(process.cwd(), 'uploads', relPath);
       if (fs.existsSync(fullPath)) {
         fs.unlinkSync(fullPath);
         return true;

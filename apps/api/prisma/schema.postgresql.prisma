@@ -4,9 +4,8 @@
 // ==============================================================================
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 generator client {
@@ -108,9 +107,9 @@ model AuthSession {
 
   user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId], map: "idx_session_user")
-  @@index([familyId], map: "idx_session_family")
-  @@index([expiresAt], map: "idx_session_expires")
+  @@index([userId], name: "idx_session_user")
+  @@index([familyId], name: "idx_session_family")
+  @@index([expiresAt], name: "idx_session_expires")
 }
 
 model Category {
@@ -135,9 +134,9 @@ model Category {
   works            CreativeWork[]
   products         CreativeProduct[]
 
-  @@unique([kind, slug], map: "uq_category_kind_slug")
-  @@unique([kind, name], map: "uq_category_kind_name")
-  @@index([kind, isActive, sortOrder], map: "idx_category_lookup")
+  @@unique([kind, slug], name: "uq_category_kind_slug")
+  @@unique([kind, name], name: "uq_category_kind_name")
+  @@index([kind, isActive, sortOrder], name: "idx_category_lookup")
 }
 
 model SubApp {
@@ -161,8 +160,8 @@ model SubApp {
 
   categories  SubAppCategory[]
 
-  @@index([status, publishedAt(sort: Desc)], map: "idx_subapp_status_published")
-  @@index([status, name], map: "idx_subapp_status_name")
+  @@index([status, publishedAt(sort: Desc)], name: "idx_subapp_status_published")
+  @@index([status, name], name: "idx_subapp_status_name")
 }
 
 model SubAppCategory {
@@ -173,7 +172,7 @@ model SubAppCategory {
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
   @@id([subAppId, categoryId])
-  @@index([categoryId], map: "idx_subapp_category")
+  @@index([categoryId], name: "idx_subapp_category")
 }
 
 model CreativeProfile {
@@ -204,9 +203,9 @@ model CreativeProfile {
   works           CreativeWork[]
   products        CreativeProduct[]
 
-  @@index([status, publishedAt(sort: Desc)], map: "idx_creative_status_published")
-  @@index([status, city], map: "idx_creative_status_city")
-  @@index([status, district], map: "idx_creative_status_district")
+  @@index([status, publishedAt(sort: Desc)], name: "idx_creative_status_published")
+  @@index([status, city], name: "idx_creative_status_city")
+  @@index([status, district], name: "idx_creative_status_district")
 }
 
 model CreativeProfileCategory {
@@ -217,7 +216,7 @@ model CreativeProfileCategory {
   category          Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
   @@id([creativeProfileId, categoryId])
-  @@index([categoryId], map: "idx_creative_category")
+  @@index([categoryId], name: "idx_creative_category")
 }
 
 model CreativeProfileOwner {
@@ -262,9 +261,9 @@ model CreativeWork {
   updatedBy         User?           @relation("WorkUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   products          CreativeProduct[]
 
-  @@index([status, publishedAt(sort: Desc)], map: "idx_work_status_published")
-  @@index([creativeProfileId, status], map: "idx_work_creator_status")
-  @@index([categoryId], map: "idx_work_category")
+  @@index([status, publishedAt(sort: Desc)], name: "idx_work_status_published")
+  @@index([creativeProfileId, status], name: "idx_work_creator_status")
+  @@index([categoryId], name: "idx_work_category")
 }
 
 model CreativeProduct {
@@ -301,7 +300,7 @@ model CreativeProduct {
   createdBy         User?               @relation("ProductCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   updatedBy         User?               @relation("ProductUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
 
-  @@index([status, publishedAt(sort: Desc)], map: "idx_prod_status_published")
-  @@index([creativeProfileId, status], map: "idx_prod_creator_status")
-  @@index([productTypeId], map: "idx_prod_type")
+  @@index([status, publishedAt(sort: Desc)], name: "idx_prod_status_published")
+  @@index([creativeProfileId, status], name: "idx_prod_creator_status")
+  @@index([productTypeId], name: "idx_prod_type")
 }

@@ -1,93 +1,51 @@
-// ==============================================================================
-// Ekraf HUB — Prisma Schema for Supabase PostgreSQL (Production Target)
-// Synchronized with docs/supabase_schema.sql
-// ==============================================================================
-
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native"]
 }
 
-enum Role {
-  USER
-  ADMIN
-}
-
-enum ContentStatus {
-  DRAFT
-  PENDING_REVIEW
-  NEEDS_REVISION
-  REJECTED
-  PUBLISHED
-  ARCHIVED
-}
-
-enum CategoryKind {
-  SUBSECTOR
-  SUBAPP_TYPE
-  WORK_CATEGORY
-  PRODUCT_TYPE
-}
-
-enum ProductAvailability {
-  AVAILABLE
-  MADE_TO_ORDER
-  UNAVAILABLE
-}
+// Role: USER, ADMIN
+// ContentStatus: DRAFT, PENDING_REVIEW, NEEDS_REVISION, REJECTED, PUBLISHED, ARCHIVED
+// CategoryKind: SUBSECTOR, SUBAPP_TYPE, WORK_CATEGORY, PRODUCT_TYPE
+// Availability: AVAILABLE, MADE_TO_ORDER, UNAVAILABLE
 
 model User {
-  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id           String        @id @default(uuid())
   email        String        @unique
   passwordHash String
-  role         Role          @default(USER)
+  role         String        @default("USER") // USER | ADMIN
   isActive     Boolean       @default(true)
-  lastLoginAt  DateTime?     @db.Timestamptz
-  createdAt    DateTime      @default(now()) @db.Timestamptz
-  updatedAt    DateTime      @default(now()) @updatedAt @db.Timestamptz
+  lastLoginAt  DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
-  profile       UserProfile?
-  sessions      AuthSession[]
-  ownedProfile  CreativeProfileOwner?
-
-  // Audit Relations
-  createdCategories Category[]        @relation("CategoryCreatedBy")
-  updatedCategories Category[]        @relation("CategoryUpdatedBy")
-  createdSubApps    SubApp[]          @relation("SubAppCreatedBy")
-  updatedSubApps    SubApp[]          @relation("SubAppUpdatedBy")
-  createdProfiles   CreativeProfile[] @relation("ProfileCreatedBy")
-  updatedProfiles   CreativeProfile[] @relation("ProfileUpdatedBy")
-  assignedOwners    CreativeProfileOwner[] @relation("OwnerAssignedBy")
-  reviewedWorks     CreativeWork[]    @relation("WorkReviewedBy")
-  createdWorks      CreativeWork[]    @relation("WorkCreatedBy")
-  updatedWorks      CreativeWork[]    @relation("WorkUpdatedBy")
-  reviewedProducts  CreativeProduct[] @relation("ProductReviewedBy")
-  createdProducts   CreativeProduct[] @relation("ProductCreatedBy")
-  updatedProducts   CreativeProduct[] @relation("ProductUpdatedBy")
+  profile      UserProfile?
+  sessions     AuthSession[]
+  ownedProfile CreativeProfileOwner?
 }
 
 model UserProfile {
-  id           String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId       String                @unique @db.Uuid
+  id           String                @id @default(uuid())
+  userId       String                @unique
   displayName  String
   locationText String?
   photoPath    String?
-  bio          String?               @db.VarChar(500)
-  createdAt    DateTime              @default(now()) @db.Timestamptz
-  updatedAt    DateTime              @default(now()) @updatedAt @db.Timestamptz
+  bio          String?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
 
   user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   interests    UserProfileInterest[]
 }
 
 model UserProfileInterest {
-  userProfileId String      @db.Uuid
-  categoryId    String      @db.Uuid
-  createdAt     DateTime    @default(now()) @db.Timestamptz
+  userProfileId String
+  categoryId    String
+  createdAt     DateTime    @default(now())
 
   profile       UserProfile @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
   category      Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
@@ -96,38 +54,35 @@ model UserProfileInterest {
 }
 
 model AuthSession {
-  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId              String    @db.Uuid
-  familyId            String    @db.Uuid
+  id                  String    @id @default(uuid())
+  userId              String
+  familyId            String
   refreshTokenHash    String    @unique
-  expiresAt           DateTime  @db.Timestamptz
-  revokedAt           DateTime? @db.Timestamptz
-  replacedBySessionId String?   @db.Uuid
+  expiresAt           DateTime
+  revokedAt           DateTime?
+  replacedBySessionId String?
   userAgent           String?
-  createdAt           DateTime  @default(now()) @db.Timestamptz
+  createdAt           DateTime  @default(now())
 
   user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId], map: "idx_session_user")
-  @@index([familyId], map: "idx_session_family")
-  @@index([expiresAt], map: "idx_session_expires")
+  @@index([userId])
+  @@index([familyId])
+  @@index([expiresAt])
 }
 
 model Category {
-  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  kind        CategoryKind
-  name        String
-  slug        String
-  description String?
-  isActive    Boolean      @default(true)
-  sortOrder   Int          @default(0)
-  createdById String?      @db.Uuid
-  updatedById String?      @db.Uuid
-  createdAt   DateTime     @default(now()) @db.Timestamptz
-  updatedAt   DateTime     @default(now()) @updatedAt @db.Timestamptz
-
-  createdBy   User?        @relation("CategoryCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedBy   User?        @relation("CategoryUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  id               String                    @id @default(uuid())
+  kind             String                    // SUBSECTOR | SUBAPP_TYPE | WORK_CATEGORY | PRODUCT_TYPE
+  name             String
+  slug             String
+  description      String?
+  isActive         Boolean                   @default(true)
+  sortOrder        Int                       @default(0)
+  createdById      String?
+  updatedById      String?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
 
   subApps          SubAppCategory[]
   creativeProfiles CreativeProfileCategory[]
@@ -135,51 +90,48 @@ model Category {
   works            CreativeWork[]
   products         CreativeProduct[]
 
-  @@unique([kind, slug], map: "uq_category_kind_slug")
-  @@unique([kind, name], map: "uq_category_kind_name")
-  @@index([kind, isActive, sortOrder], map: "idx_category_lookup")
+  @@unique([kind, slug])
+  @@unique([kind, name])
+  @@index([kind, isActive, sortOrder])
 }
 
 model SubApp {
-  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id          String           @id @default(uuid())
   name        String
-  slug        String        @unique
+  slug        String           @unique
   tagline     String
   description String
   externalUrl String
   imagePath   String?
-  status      ContentStatus @default(DRAFT)
-  publishedAt DateTime?     @db.Timestamptz
-  archivedAt  DateTime?     @db.Timestamptz
-  createdById String?       @db.Uuid
-  updatedById String?       @db.Uuid
-  createdAt   DateTime      @default(now()) @db.Timestamptz
-  updatedAt   DateTime      @default(now()) @updatedAt @db.Timestamptz
-
-  createdBy   User?         @relation("SubAppCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedBy   User?         @relation("SubAppUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  status      String           @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
+  publishedAt DateTime?
+  archivedAt  DateTime?
+  createdById String?
+  updatedById String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
   categories  SubAppCategory[]
 
-  @@index([status, publishedAt(sort: Desc)], map: "idx_subapp_status_published")
-  @@index([status, name], map: "idx_subapp_status_name")
+  @@index([status, publishedAt])
+  @@index([status, name])
 }
 
 model SubAppCategory {
-  subAppId   String   @db.Uuid
-  categoryId String   @db.Uuid
+  subAppId   String
+  categoryId String
 
   subApp     SubApp   @relation(fields: [subAppId], references: [id], onDelete: Cascade)
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
   @@id([subAppId, categoryId])
-  @@index([categoryId], map: "idx_subapp_category")
+  @@index([categoryId])
 }
 
 model CreativeProfile {
-  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id              String                    @id @default(uuid())
   name            String
-  slug            String        @unique
+  slug            String                    @unique
   summary         String
   description     String
   city            String
@@ -188,120 +140,113 @@ model CreativeProfile {
   websiteUrl      String?
   instagramHandle String?
   whatsappNumber  String?
-  status          ContentStatus @default(DRAFT)
-  publishedAt     DateTime?     @db.Timestamptz
-  archivedAt      DateTime?     @db.Timestamptz
-  createdById     String?       @db.Uuid
-  updatedById     String?       @db.Uuid
-  createdAt       DateTime      @default(now()) @db.Timestamptz
-  updatedAt       DateTime      @default(now()) @updatedAt @db.Timestamptz
-
-  createdBy       User?         @relation("ProfileCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedBy       User?         @relation("ProfileUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  status          String                    @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
+  publishedAt     DateTime?
+  archivedAt      DateTime?
+  createdById     String?
+  updatedById     String?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
 
   categories      CreativeProfileCategory[]
   owner           CreativeProfileOwner?
   works           CreativeWork[]
   products        CreativeProduct[]
 
-  @@index([status, publishedAt(sort: Desc)], map: "idx_creative_status_published")
-  @@index([status, city], map: "idx_creative_status_city")
-  @@index([status, district], map: "idx_creative_status_district")
+  @@index([status, publishedAt])
+  @@index([status, city])
+  @@index([status, district])
 }
 
 model CreativeProfileCategory {
-  creativeProfileId String          @db.Uuid
-  categoryId        String          @db.Uuid
+  creativeProfileId String
+  categoryId        String
 
   creativeProfile   CreativeProfile @relation(fields: [creativeProfileId], references: [id], onDelete: Cascade)
   category          Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
   @@id([creativeProfileId, categoryId])
-  @@index([categoryId], map: "idx_creative_category")
+  @@index([categoryId])
 }
 
+// K-01: Explicit Owner Link between User and CreativeProfile
 model CreativeProfileOwner {
-  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  creativeProfileId String          @unique @db.Uuid
-  userId            String          @unique @db.Uuid
-  assignedById      String?         @db.Uuid
-  createdAt         DateTime        @default(now()) @db.Timestamptz
+  id                String          @id @default(uuid())
+  creativeProfileId String          @unique
+  userId            String          @unique
+  assignedById      String?
+  createdAt         DateTime        @default(now())
 
   creativeProfile   CreativeProfile @relation(fields: [creativeProfileId], references: [id], onDelete: Cascade)
   user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  assignedBy        User?           @relation("OwnerAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
 }
 
+// Showcase Works model
 model CreativeWork {
-  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  creativeProfileId String          @db.Uuid
+  id                String          @id @default(uuid())
+  creativeProfileId String
   title             String
   slug              String          @unique
   description       String
-  imagePaths        String          @default("[]")
+  imagePaths        String          @default("[]") // JSON array string of up to 5 image paths
   technique         String?
   motif             String?
   year              Int?
-  categoryId        String?         @db.Uuid
-  status            ContentStatus   @default(DRAFT)
+  categoryId        String?
+  status            String          @default("DRAFT") // DRAFT, PENDING_REVIEW, NEEDS_REVISION, REJECTED, PUBLISHED, ARCHIVED
   reviewNote        String?
-  submittedAt       DateTime?       @db.Timestamptz
-  reviewedAt        DateTime?       @db.Timestamptz
-  reviewedById      String?         @db.Uuid
-  publishedAt       DateTime?       @db.Timestamptz
-  archivedAt        DateTime?       @db.Timestamptz
-  createdById       String?         @db.Uuid
-  updatedById       String?         @db.Uuid
-  createdAt         DateTime        @default(now()) @db.Timestamptz
-  updatedAt         DateTime        @default(now()) @updatedAt @db.Timestamptz
+  submittedAt       DateTime?
+  reviewedAt        DateTime?
+  reviewedById      String?
+  publishedAt       DateTime?
+  archivedAt        DateTime?
+  createdById       String?
+  updatedById       String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 
   creativeProfile   CreativeProfile @relation(fields: [creativeProfileId], references: [id], onDelete: Restrict)
   category          Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  reviewedBy        User?           @relation("WorkReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
-  createdBy         User?           @relation("WorkCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedBy         User?           @relation("WorkUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   products          CreativeProduct[]
 
-  @@index([status, publishedAt(sort: Desc)], map: "idx_work_status_published")
-  @@index([creativeProfileId, status], map: "idx_work_creator_status")
-  @@index([categoryId], map: "idx_work_category")
+  @@index([status, publishedAt])
+  @@index([creativeProfileId, status])
+  @@index([categoryId])
 }
 
+// Pasar Creative Products model
 model CreativeProduct {
-  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  creativeProfileId String              @db.Uuid
-  workId            String?             @db.Uuid
+  id                String          @id @default(uuid())
+  creativeProfileId String
+  workId            String?
   title             String
-  slug              String              @unique
+  slug              String          @unique
   description       String
-  imagePaths        String              @default("[]")
-  productTypeId     String              @db.Uuid
+  imagePaths        String          @default("[]") // JSON array string of up to 5 image paths
+  productTypeId     String
   material          String?
   dimensions        String?
   priceMin          Int?
   priceMax          Int?
-  priceUnit         String?             @db.VarChar(30)
-  availability      ProductAvailability @default(AVAILABLE)
-  status            ContentStatus       @default(DRAFT)
+  priceUnit         String?
+  availability      String          @default("AVAILABLE") // AVAILABLE, MADE_TO_ORDER, UNAVAILABLE
+  status            String          @default("DRAFT") // DRAFT, PENDING_REVIEW, NEEDS_REVISION, REJECTED, PUBLISHED, ARCHIVED
   reviewNote        String?
-  submittedAt       DateTime?           @db.Timestamptz
-  reviewedAt        DateTime?           @db.Timestamptz
-  reviewedById      String?             @db.Uuid
-  publishedAt       DateTime?           @db.Timestamptz
-  archivedAt        DateTime?           @db.Timestamptz
-  createdById       String?             @db.Uuid
-  updatedById       String?             @db.Uuid
-  createdAt         DateTime            @default(now()) @db.Timestamptz
-  updatedAt         DateTime            @default(now()) @updatedAt @db.Timestamptz
+  submittedAt       DateTime?
+  reviewedAt        DateTime?
+  reviewedById      String?
+  publishedAt       DateTime?
+  archivedAt        DateTime?
+  createdById       String?
+  updatedById       String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 
-  creativeProfile   CreativeProfile     @relation(fields: [creativeProfileId], references: [id], onDelete: Restrict)
-  productType       Category            @relation(fields: [productTypeId], references: [id], onDelete: Restrict)
-  work              CreativeWork?       @relation(fields: [workId], references: [id], onDelete: SetNull)
-  reviewedBy        User?               @relation("ProductReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
-  createdBy         User?               @relation("ProductCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedBy         User?               @relation("ProductUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  creativeProfile   CreativeProfile @relation(fields: [creativeProfileId], references: [id], onDelete: Restrict)
+  productType       Category        @relation(fields: [productTypeId], references: [id], onDelete: Restrict)
+  work              CreativeWork?   @relation(fields: [workId], references: [id], onDelete: SetNull)
 
-  @@index([status, publishedAt(sort: Desc)], map: "idx_prod_status_published")
-  @@index([creativeProfileId, status], map: "idx_prod_creator_status")
-  @@index([productTypeId], map: "idx_prod_type")
+  @@index([status, publishedAt])
+  @@index([creativeProfileId, status])
+  @@index([productTypeId])
 }

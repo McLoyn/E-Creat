@@ -74,6 +74,5 @@ SUPABASE_STORAGE_BUCKET="ekraf-public"
 
 ---
 
-## 5. Perilaku Environment & Mode Fallback Lokal
-- **Production (`NODE_ENV=production`):** Fallback disk lokal **DILARANG KERAS**. Sistem akan gagal startup atau menolak unggahan (HTTP 500 fail-fast) jika `SUPABASE_URL` atau `SUPABASE_SERVICE_ROLE_KEY` tidak tersedia. Hal ini melindungi dari risiko kehilangan aset media pada ephemeral/serverless container.
-- **Development (`NODE_ENV=development`):** Jika `SUPABASE_URL` atau `SUPABASE_SERVICE_ROLE_KEY` belum dikonfigurasi saat pengujian offline, sistem menggunakan penyimpanan disk lokal (`uploads/`) untuk mempermudah development tanpa koneksi internet.
+## 5. Mode Fallback Lokal (Offline Development)
+Jika `SUPABASE_URL` atau `SUPABASE_SERVICE_ROLE_KEY` tidak tersedia (misalnya saat pengujian luring di lingkungan lokal pengembang), sistem secara cerdas beralih ke mode penyimpanan disk lokal (`uploads/`) tanpa menyebabkan error atau kegagalan API.

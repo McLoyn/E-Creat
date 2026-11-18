@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
-import crypto, { randomUUID, randomBytes } from 'crypto';
+import crypto, { randomUUID } from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import { prisma } from '../db.js';
 import { Prisma } from '@prisma/client';
@@ -58,8 +58,8 @@ async function createSessionAndSetCookies(
 ) {
   const familyId = randomUUID();
   const sessionId = randomUUID();
-  const tokenSecret = randomBytes(32).toString('hex');
-  const tokenHash = hashToken(tokenSecret);
+  const rawRefreshToken = randomUUID() + '.' + Date.now();
+  const tokenHash = hashToken(rawRefreshToken);
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
   await prisma.authSession.create({
@@ -79,7 +79,7 @@ async function createSessionAndSetCookies(
   });
 
   const accessToken = signAccessToken({ userId: user.id, role: user.role });
-  const refreshToken = signRefreshToken({ userId: user.id, sessionId, familyId, tokenSecret });
+  const refreshToken = signRefreshToken({ userId: user.id, sessionId, familyId });
 
   setAuthCookies(res, accessToken, refreshToken);
   return { accessToken, refreshToken };
@@ -147,8 +147,8 @@ authRouter.post('/register', async (req: Request, res: Response, next: NextFunct
       });
 
       const tempId = randomUUID();
-      const tokenSecret = randomBytes(32).toString('hex');
-      const tokenHash = hashToken(tokenSecret);
+      const rawRefreshToken = randomUUID() + '.' + Date.now();
+      const tokenHash = hashToken(rawRefreshToken);
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
       const session = await tx.authSession.create({
@@ -163,7 +163,7 @@ authRouter.post('/register', async (req: Request, res: Response, next: NextFunct
       });
 
       const accessToken = signAccessToken({ userId: user.id, role: user.role });
-      const refreshToken = signRefreshToken({ userId: user.id, sessionId: session.id, familyId, tokenSecret });
+      const refreshToken = signRefreshToken({ userId: user.id, sessionId: session.id, familyId });
 
       return { user, accessToken, refreshToken };
     });
@@ -566,7 +566,7 @@ authRouter.post('/google', async (req: Request, res: Response, next: NextFunctio
   }
 });
 
-// POST /refresh (Atomic rotation, token hash verification, & reuse detection)
+// POST /refresh (Atomic rotation & reuse detection)
 authRouter.post('/refresh', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const rawToken = req.cookies?.ekraf_rt;
@@ -578,11 +578,10 @@ authRouter.post('/refresh', async (req: Request, res: Response, next: NextFuncti
       });
     }
 
-    let payload: { userId: string; sessionId: string; familyId: string; tokenSecret?: string };
+    let payload: { userId: string; sessionId: string; familyId: string };
     try {
       payload = verifyRefreshToken(rawToken);
     } catch {
-      clearAuthCookies(res);
       throw new AppError({
         code: 'UNAUTHENTICATED',
         message: 'Token refresh tidak valid atau kedaluwarsa.',
@@ -590,54 +589,22 @@ authRouter.post('/refresh', async (req: Request, res: Response, next: NextFuncti
       });
     }
 
-    if (!payload.tokenSecret) {
-      clearAuthCookies(res);
-      throw new AppError({
-        code: 'UNAUTHENTICATED',
-        message: 'Token refresh tidak memiliki verifikasi identitas yang valid.',
-        status: 401,
-      });
-    }
-
-    const incomingHash = hashToken(payload.tokenSecret);
-
     const session = await prisma.authSession.findUnique({
       where: { id: payload.sessionId },
-      include: {
-        user: {
-          include: { profile: true },
-        },
-      },
     });
 
     if (!session) {
-      clearAuthCookies(res);
       throw new AppError({
         code: 'UNAUTHENTICATED',
-        message: 'Sesi tidak ditemukan atau telah dicabut.',
+        message: 'Sesi tidak ditemukan.',
         status: 401,
       });
     }
 
-    // 1. Verify token hash against database record (Anti-tampering)
-    const dbHashBuf = Buffer.from(session.refreshTokenHash, 'utf-8');
-    const inHashBuf = Buffer.from(incomingHash, 'utf-8');
-    const hashMatches =
-      dbHashBuf.length === inHashBuf.length && crypto.timingSafeEqual(dbHashBuf, inHashBuf);
-
-    if (!hashMatches) {
-      clearAuthCookies(res);
-      throw new AppError({
-        code: 'UNAUTHENTICATED',
-        message: 'Hash token refresh tidak cocok dengan sesi aktif.',
-        status: 401,
-      });
-    }
-
-    // 2. Reuse detection: If session was already revoked or replaced, revoke entire family
+    // Reuse detection: If session was already revoked or replaced, revoke entire family
     if (session.revokedAt || session.replacedBySessionId) {
       await prisma.authSession.updateMany({
-        where: { familyId: session.familyId },
+        where: { familyId: payload.familyId },
         data: { revokedAt: new Date() },
       });
       clearAuthCookies(res);
@@ -648,104 +615,60 @@ authRouter.post('/refresh', async (req: Request, res: Response, next: NextFuncti
       });
     }
 
-    // 3. Expiration check
-    if (new Date(session.expiresAt) <= new Date()) {
-      await prisma.authSession.update({
-        where: { id: session.id },
-        data: { revokedAt: new Date() },
-      });
-      clearAuthCookies(res);
-      throw new AppError({
-        code: 'UNAUTHENTICATED',
-        message: 'Sesi telah kedaluwarsa.',
-        status: 401,
-      });
-    }
-
-    // 4. User active check
-    if (!session.user || !session.user.isActive) {
-      await prisma.authSession.update({
-        where: { id: session.id },
-        data: { revokedAt: new Date() },
-      });
-      clearAuthCookies(res);
-      throw new AppError({
-        code: 'UNAUTHENTICATED',
-        message: 'Akun pengguna dinonaktifkan.',
-        status: 401,
-      });
-    }
-
-    // 5. Normal rotation: Atomic compare-and-swap (CAS) transaction
+    // Normal rotation: atomic transaction
     const newSessionId = randomUUID();
-    const newTokenSecret = randomBytes(32).toString('hex');
-    const newHash = hashToken(newTokenSecret);
+    const newRawRefreshToken = randomUUID() + '.' + Date.now();
+    const newHash = hashToken(newRawRefreshToken);
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    try {
-      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-        // CAS: only update if currently active and matching
-        const cas = await tx.authSession.updateMany({
-          where: {
-            id: session.id,
-            revokedAt: null,
-            replacedBySessionId: null,
-            refreshTokenHash: incomingHash,
-          },
-          data: {
-            revokedAt: new Date(),
-            replacedBySessionId: newSessionId,
-          },
-        });
+    await prisma.$transaction([
+      prisma.authSession.update({
+        where: { id: session.id },
+        data: {
+          revokedAt: new Date(),
+          replacedBySessionId: newSessionId,
+        },
+      }),
+      prisma.authSession.create({
+        data: {
+          id: newSessionId,
+          userId: payload.userId,
+          familyId: payload.familyId,
+          refreshTokenHash: newHash,
+          expiresAt,
+          userAgent: req.headers['user-agent'],
+        },
+      }),
+    ]);
 
-        if (cas.count !== 1) {
-          throw new Error('CONCURRENT_ROTATION_CONFLICT');
-        }
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      include: { profile: true },
+    });
 
-        await tx.authSession.create({
-          data: {
-            id: newSessionId,
-            userId: session.user.id,
-            familyId: session.familyId,
-            refreshTokenHash: newHash,
-            expiresAt,
-            userAgent: req.headers['user-agent'],
-          },
-        });
+    if (!user || !user.isActive) {
+      throw new AppError({
+        code: 'UNAUTHENTICATED',
+        message: 'Pengguna dinonaktifkan.',
+        status: 401,
       });
-    } catch (txErr: any) {
-      if (txErr?.message === 'CONCURRENT_ROTATION_CONFLICT') {
-        // Race condition / concurrent replay detected! Revoke the family
-        await prisma.authSession.updateMany({
-          where: { familyId: session.familyId },
-          data: { revokedAt: new Date() },
-        });
-        clearAuthCookies(res);
-        throw new AppError({
-          code: 'UNAUTHENTICATED',
-          message: 'Konflik rotasi paralel terdeteksi. Sesi telah dicabut demi keamanan.',
-          status: 401,
-        });
-      }
-      throw txErr;
     }
 
-    const newAccessToken = signAccessToken({ userId: session.user.id, role: session.user.role });
+    const newAccessToken = signAccessToken({ userId: user.id, role: user.role });
     const newRefreshToken = signRefreshToken({
-      userId: session.user.id,
+      userId: user.id,
       sessionId: newSessionId,
-      familyId: session.familyId,
-      tokenSecret: newTokenSecret,
+      familyId: payload.familyId,
     });
 
     setAuthCookies(res, newAccessToken, newRefreshToken);
 
     return res.json({
       data: {
-        id: session.user.id,
-        email: session.user.email,
-        role: session.user.role,
-        profile: session.user.profile,
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        profile: user.profile,
       },
     });
   } catch (err) {

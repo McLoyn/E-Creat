@@ -6,11 +6,6 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('Seeding Ekraf HUB database...');
 
-  const isProduction = process.env.NODE_ENV === 'production';
-  if (isProduction && (!process.env.SEED_ADMIN_PASSWORD || process.env.SEED_ADMIN_PASSWORD === 'AdminPassword123!')) {
-    throw new Error('Keamanan Seed Produksi: SEED_ADMIN_PASSWORD wajib diatur dengan kata sandi unik dan kuat pada mode production.');
-  }
-
   const adminEmail = (process.env.SEED_ADMIN_EMAIL || 'admin@ekraftuban.id').toLowerCase();
   const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'AdminPassword123!';
   const userPassword = process.env.SEED_USER_PASSWORD || 'UserPassword123!';
@@ -18,7 +13,10 @@ async function main() {
   const adminHash = await bcrypt.hash(adminPassword, 10);
   const userHash = await bcrypt.hash(userPassword, 10);
 
-  // 1. Seed Admin User
+  if (process.env.NODE_ENV === 'production') {
+  throw new Error('Seed script aborted: should not run in production environment.');
+}
+
   let admin = await prisma.user.findUnique({ where: { email: adminEmail } });
   if (!admin) {
     admin = await prisma.user.create({

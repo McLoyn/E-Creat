@@ -6,7 +6,6 @@ export interface AppConfig {
   nodeEnv: string;
   isProduction: boolean;
   databaseUrl: string;
-  directUrl: string;
   jwtAccessSecret: string;
   jwtRefreshSecret: string;
   webOrigins: string[];
@@ -42,7 +41,7 @@ export function validateAndLoadConfig(): AppConfig {
   const nodeEnv = process.env.NODE_ENV || 'development';
   const isProduction = nodeEnv === 'production';
   const port = parseInt(process.env.PORT || '4000', 10);
-  const host = process.env.HOST || (isProduction ? '0.0.0.0' : '127.0.0.1');
+  const host = process.env.HOST || '127.0.0.1';
 
   const jwtAccessSecret = process.env.JWT_ACCESS_SECRET;
   const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET;
@@ -63,10 +62,6 @@ export function validateAndLoadConfig(): AppConfig {
     }
   }
 
-  if (jwtAccessSecret && jwtRefreshSecret && jwtAccessSecret === jwtRefreshSecret) {
-    throw new Error('Konfigurasi Keamanan Kritis: JWT_ACCESS_SECRET dan JWT_REFRESH_SECRET harus berbeda.');
-  }
-
   if (isProduction) {
     if (
       INSECURE_DEFAULT_SECRETS.includes(jwtAccessSecret!) ||
@@ -81,40 +76,15 @@ export function validateAndLoadConfig(): AppConfig {
   const cookieSecure =
     process.env.COOKIE_SECURE === 'true' || (isProduction && process.env.COOKIE_SECURE !== 'false');
 
-  const databaseUrl = process.env.DATABASE_URL || 'file:./dev.db';
-  const directUrl = process.env.DIRECT_URL || databaseUrl;
-
-  // Auto-fill DIRECT_URL if not explicitly set in development
-  if (!process.env.DIRECT_URL && process.env.DATABASE_URL) {
-    process.env.DIRECT_URL = process.env.DATABASE_URL;
-  }
-
   if (isProduction) {
-    if (!databaseUrl || (!databaseUrl.startsWith('postgresql://') && !databaseUrl.startsWith('postgres://'))) {
-      throw new Error(
-        'Konfigurasi Database Kritis: DATABASE_URL wajib menggunakan PostgreSQL (postgresql:// atau postgres://) pada mode production. Fallback SQLite dilarang.'
-      );
-    }
-
-    if (databaseUrl.includes('dev.db') || databaseUrl.startsWith('file:')) {
-      throw new Error('Konfigurasi Database Kritis: Dilarang menggunakan SQLite pada mode production.');
-    }
+  if (!process.env.DATABASE_URL) {
+    throw new Error('Konfigurasi Keamanan Kritis: DATABASE_URL wajib diisi pada environment production.');
   }
-
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const supabaseStorageBucket = process.env.SUPABASE_STORAGE_BUCKET || 'ekraf-public';
-
-  if (isProduction) {
-    if (!supabaseUrl || !supabaseServiceRoleKey) {
-      throw new Error(
-        'Konfigurasi Storage Kritis: SUPABASE_URL dan SUPABASE_SERVICE_ROLE_KEY wajib diisi pada mode production. Fallback penyimpanan lokal dilarang.'
-      );
-    }
-    if (!supabaseUrl.startsWith('https://')) {
-      throw new Error('Konfigurasi Storage Kritis: SUPABASE_URL wajib berupa URL HTTPS yang valid.');
-    }
+  if (!process.env.DIRECT_URL) {
+    throw new Error('Konfigurasi Keamanan Kritis: DIRECT_URL wajib diisi pada environment production.');
   }
+}
+const databaseUrl = process.env.DATABASE_URL;
 
   return {
     port,
@@ -122,7 +92,6 @@ export function validateAndLoadConfig(): AppConfig {
     nodeEnv,
     isProduction,
     databaseUrl,
-    directUrl,
     jwtAccessSecret: jwtAccessSecret || 'dev_temporary_insecure_access_secret_only_for_test_at_least_32_chars_long',
     jwtRefreshSecret: jwtRefreshSecret || 'dev_temporary_insecure_refresh_secret_only_for_test_at_least_32_chars_long',
     webOrigins,
@@ -130,9 +99,9 @@ export function validateAndLoadConfig(): AppConfig {
     googleClientId: process.env.GOOGLE_CLIENT_ID,
     googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
     googleRedirectUri: process.env.GOOGLE_REDIRECT_URI,
-    supabaseUrl,
-    supabaseServiceRoleKey,
-    supabaseStorageBucket,
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    supabaseStorageBucket: process.env.SUPABASE_STORAGE_BUCKET || 'ekraf-public',
   };
 }
 

@@ -10,7 +10,6 @@
     "dev:web": "pnpm --filter @ekraf/web dev",
     "build": "pnpm --filter \"@ekraf/*\" build",
     "db:migrate": "pnpm --filter @ekraf/api db:migrate",
-    "db:migrate:deploy": "pnpm --filter @ekraf/api db:migrate:deploy",
     "db:seed": "pnpm --filter @ekraf/api db:seed"
   },
   "pnpm": {
