@@ -1,0 +1,28 @@
+--- 1. Health & Baseline Tests ---
+Health: ok
+--- 2. Public Showcase & Pasar Tests ---
+Public Works Count (must be 3 published): 3
+Work detail title: Kain Gedhog Motif Ganggang Sari Pewarna Alami
+Work creator contact whatsappUrl: https://wa.me/6281234567801?text=Halo%2C%20saya%20tertarik%20dengan%20%22Kain%20Gedhog%20Motif%20Ganggang%20Sari%20Pewarna%20Alami%22%20di%20Ekraf%20HUB%20Tuban.%20Tautan%3A%20https%3A%2F%2Fekraftuban.id%2Fshowcase%2Fkain-gedhog-motif-ganggang-sari
+Public Products Count (must be 3 published): 3
+Product detail title: Kain Tenun Gedhog Tulis Asli Kerek Motif Kijing Miring
+Product contact WhatsApp URL: https://wa.me/6281234567801?text=Halo%2C%20saya%20tertarik%20dengan%20%22Kain%20Tenun%20Gedhog%20Tulis%20Asli%20Kerek%20Motif%20Kijing%20Miring%22%20di%20Ekraf%20HUB%20Tuban.%20Tautan%3A%20https%3A%2F%2Fekraftuban.id%2Fpasar%2Fkain-tenun-gedhog-tulis-asli-kerek-motif-kijing-miring
+--- 3. Creator Profile Tab Endpoints ---
+Profile works count: 3
+Profile products count: 3
+--- 4. Creator Auth & CRUD Lifecycle Tests (kreator1) ---
+Creator1 logged in: kreator1@ekraftuban.id
+Creator1 own works total: 9
+Created work draft: Kain Uji Coba Integrasi 1794624934063 Status: DRAFT
+Submitted work status: PENDING_REVIEW
+--- 5. Creator IDOR Guard Test (kreator2 unlinked) ---
+Unlinked creator status code (must be 403): 403
+--- 6. Admin Moderation & Lifecycle Tests ---
+Admin moderation queue items: 5 works: 4 products: 1
+Admin approved work status: PUBLISHED
+K-03 Invariant Test: Creator edited published work status: PENDING_REVIEW
+Admin request revision status: NEEDS_REVISION Review Note: Foto karya perlu ditambahkan minimal 1 foto detail tekstur tenun.
+
+======================================================
+🎉 ALL INTEGRATION & REGRESSION TESTS PASSED (100%)!
+======================================================

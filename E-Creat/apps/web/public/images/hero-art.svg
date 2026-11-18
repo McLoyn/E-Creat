@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" width="800" height="1000" fill="none">
+  <defs>
+    <linearGradient id="forestGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#263E35" />
+      <stop offset="100%" stop-color="#182721" />
+    </linearGradient>
+    <linearGradient id="warmGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#B95F43" />
+      <stop offset="100%" stop-color="#8E3F29" />
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F2D18D" />
+      <stop offset="100%" stop-color="#D49E43" />
+    </linearGradient>
+    <pattern id="gedogWeave" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M0 20 L20 0 L40 20 L20 40 Z" fill="none" stroke="#E9E4D9" stroke-width="1.5" stroke-opacity="0.3" />
+      <path d="M10 20 L20 10 L30 20 L20 30 Z" fill="none" stroke="#E5B968" stroke-width="1" stroke-opacity="0.25" />
+    </pattern>
+    <filter id="shadowEffect" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#000" flood-opacity="0.18" />
+    </filter>
+  </defs>
+
+  <!-- Background Base Canvas -->
+  <rect width="800" height="1000" fill="#F7F4ED" rx="32" />
+
+  <!-- Textured Craft Area -->
+  <rect x="40" y="40" width="720" height="920" rx="24" fill="url(#forestGrad)" filter="url(#shadowEffect)" />
+  <rect x="40" y="40" width="720" height="920" rx="24" fill="url(#gedogWeave)" />
+
+  <!-- Editorial Architectural Cutout Blocks -->
+  <rect x="90" y="110" width="380" height="520" rx="16" fill="url(#warmGrad)" opacity="0.9" />
+  
+  <!-- Illustrative Craft Composition: Tenun Gedog Weave & Ceramic Vessel -->
+  <g transform="translate(180, 200)">
+    <!-- Loom/Fabric Waves -->
+    <path d="M-40 420 C 60 300, 140 500, 260 360 C 340 260, 420 380, 480 320" fill="none" stroke="url(#goldGrad)" stroke-width="8" stroke-linecap="round" />
+    <path d="M-20 460 C 80 340, 160 540, 280 400 C 360 300, 440 420, 500 360" fill="none" stroke="#F7F4ED" stroke-width="3" stroke-dasharray="8 8" />
+    
+    <!-- Central Ceramic / Kriya Vessel -->
+    <ellipse cx="220" cy="260" rx="110" ry="140" fill="#E5B968" opacity="0.95" />
+    <ellipse cx="220" cy="180" rx="75" ry="32" fill="#F7F4ED" />
+    <ellipse cx="220" cy="180" rx="65" ry="24" fill="#263E35" />
+    <path d="M120 280 Q 220 380 320 280 Q 300 410 220 420 Q 140 410 120 280 Z" fill="#B95F43" />
+    
+    <!-- Geometric Gedog Diamond Motif -->
+    <polygon points="220,50 270,110 220,170 170,110" fill="none" stroke="#F7F4ED" stroke-width="4" />
+    <polygon points="220,70 250,110 220,150 190,110" fill="#E5B968" opacity="0.75" />
+  </g>
+
+  <!-- Organic Plant / Cotton Motif (Bahan Katun Gedog Khas Kerek) -->
+  <g transform="translate(110, 680)" fill="#F7F4ED" opacity="0.92">
+    <circle cx="50" cy="50" r="28" fill="#F7F4ED" />
+    <circle cx="85" cy="40" r="24" fill="#F7F4ED" />
+    <circle cx="70" cy="75" r="26" fill="#F7F4ED" />
+    <circle cx="35" cy="70" r="22" fill="#F7F4ED" />
+    <path d="M60 90 Q 55 170 120 210" fill="none" stroke="#E5B968" stroke-width="4" stroke-linecap="round" />
+  </g>
+
+  <!-- Editorial Badge Overlay -->
+  <g transform="translate(430, 750)">
+    <rect width="280" height="150" rx="16" fill="#FFFFFF" filter="url(#shadowEffect)" />
+    <text x="24" y="44" font-family="'DM Serif Display', Georgia, serif" font-size="22" font-style="italic" fill="#263E35">Wastra &amp; Kriya</text>
+    <text x="24" y="74" font-family="'Inter', sans-serif" font-size="13" font-weight="600" fill="#B95F43" letter-spacing="0.5">TRADISI GEDOG TUBAN</text>
+    <line x1="24" y1="92" x2="256" y2="92" stroke="#E9E4D9" stroke-width="1" />
+    <rect x="24" y="108" width="90" height="22" rx="4" fill="#F7F4ED" />
+    <text x="32" y="123" font-family="'Inter', sans-serif" font-size="10" font-weight="500" fill="#77766E">Foto ilustratif</text>
+  </g>
+</svg>
