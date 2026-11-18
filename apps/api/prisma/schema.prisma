@@ -26,7 +26,8 @@ model User {
 
   profile      UserProfile?
   sessions     AuthSession[]
-  ownedProfile CreativeProfileOwner?
+  ownedProfile CreativeProfileOwner? @relation("ownerUser")
+  assignedByProfiles CreativeProfileOwner[] @relation("OwnerAssignedBy")
 }
 
 model UserProfile {
@@ -178,8 +179,9 @@ model CreativeProfileOwner {
   createdAt         DateTime @default(now())
 
   creativeProfile   CreativeProfile @relation(fields: [creativeProfileId], references: [id], onDelete: Cascade)
-  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User            @relation("ownerUser", fields: [userId], references: [id], onDelete: Cascade)
   assignedBy        User?           @relation("OwnerAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+
 }
 
 model CreativeWork {
