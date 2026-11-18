@@ -1,14 +1,14 @@
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+
+
   directUrl = env("DIRECT_URL")
-  directUrl = env("DIRECT_URL")
-}
 
 generator client {
   provider      = "prisma-client-js"
   binaryTargets = ["native"]
-}
+  directUrl = env("DIRECT_URL")
 
 // Role: USER, ADMIN
 // ContentStatus: DRAFT, PENDING_REVIEW, NEEDS_REVISION, REJECTED, PUBLISHED, ARCHIVED
@@ -28,7 +28,7 @@ model User {
   profile      UserProfile?
   sessions     AuthSession[]
   ownedProfile CreativeProfileOwner?
-}
+  directUrl = env("DIRECT_URL")
 
 model UserProfile {
   id           String                @id @default(uuid())
@@ -42,7 +42,7 @@ model UserProfile {
 
   user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   interests    UserProfileInterest[]
-}
+  directUrl = env("DIRECT_URL")
 
 model UserProfileInterest {
   userProfileId String
@@ -53,7 +53,7 @@ model UserProfileInterest {
   category      Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
   @@id([userProfileId, categoryId])
-}
+  directUrl = env("DIRECT_URL")
 
 model AuthSession {
   id                  String    @id @default(uuid())
@@ -71,7 +71,7 @@ model AuthSession {
   @@index([userId])
   @@index([familyId])
   @@index([expiresAt])
-}
+  directUrl = env("DIRECT_URL")
 
 model Category {
   id               String                    @id @default(uuid())
@@ -95,7 +95,7 @@ model Category {
   @@unique([kind, slug])
   @@unique([kind, name])
   @@index([kind, isActive, sortOrder])
-}
+  directUrl = env("DIRECT_URL")
 
 model SubApp {
   id          String           @id @default(uuid())
@@ -117,7 +117,7 @@ model SubApp {
 
   @@index([status, publishedAt])
   @@index([status, name])
-}
+  directUrl = env("DIRECT_URL")
 
 model SubAppCategory {
   subAppId   String
@@ -128,7 +128,7 @@ model SubAppCategory {
 
   @@id([subAppId, categoryId])
   @@index([categoryId])
-}
+  directUrl = env("DIRECT_URL")
 
 model CreativeProfile {
   id              String                    @id @default(uuid())
@@ -158,7 +158,7 @@ model CreativeProfile {
   @@index([status, publishedAt])
   @@index([status, city])
   @@index([status, district])
-}
+  directUrl = env("DIRECT_URL")
 
 model CreativeProfileCategory {
   creativeProfileId String
@@ -169,7 +169,7 @@ model CreativeProfileCategory {
 
   @@id([creativeProfileId, categoryId])
   @@index([categoryId])
-}
+  directUrl = env("DIRECT_URL")
 
 // K-01: Explicit Owner Link between User and CreativeProfile
 model CreativeProfileOwner {
@@ -181,7 +181,7 @@ model CreativeProfileOwner {
 
   creativeProfile   CreativeProfile @relation(fields: [creativeProfileId], references: [id], onDelete: Cascade)
   user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
+  directUrl = env("DIRECT_URL")
 
 // Showcase Works model
 model CreativeWork {
@@ -214,7 +214,7 @@ model CreativeWork {
   @@index([status, publishedAt])
   @@index([creativeProfileId, status])
   @@index([categoryId])
-}
+  directUrl = env("DIRECT_URL")
 
 // Pasar Creative Products model
 model CreativeProduct {
@@ -251,4 +251,4 @@ model CreativeProduct {
   @@index([status, publishedAt])
   @@index([creativeProfileId, status])
   @@index([productTypeId])
-}
+  directUrl = env("DIRECT_URL")
