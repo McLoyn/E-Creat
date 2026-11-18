@@ -1,14 +1,13 @@
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-
-
   directUrl = env("DIRECT_URL")
+}
 
 generator client {
-  provider      = "prisma-client-js"
+  provider = "prisma-client-js"
   binaryTargets = ["native"]
-  directUrl = env("DIRECT_URL")
+}
 
 // Role: USER, ADMIN
 // ContentStatus: DRAFT, PENDING_REVIEW, NEEDS_REVISION, REJECTED, PUBLISHED, ARCHIVED
@@ -28,7 +27,7 @@ model User {
   profile      UserProfile?
   sessions     AuthSession[]
   ownedProfile CreativeProfileOwner?
-  directUrl = env("DIRECT_URL")
+}
 
 model UserProfile {
   id           String                @id @default(uuid())
@@ -42,7 +41,7 @@ model UserProfile {
 
   user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   interests    UserProfileInterest[]
-  directUrl = env("DIRECT_URL")
+}
 
 model UserProfileInterest {
   userProfileId String
@@ -53,7 +52,7 @@ model UserProfileInterest {
   category      Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
   @@id([userProfileId, categoryId])
-  directUrl = env("DIRECT_URL")
+}
 
 model AuthSession {
   id                  String    @id @default(uuid())
@@ -71,7 +70,7 @@ model AuthSession {
   @@index([userId])
   @@index([familyId])
   @@index([expiresAt])
-  directUrl = env("DIRECT_URL")
+}
 
 model Category {
   id               String                    @id @default(uuid())
@@ -95,29 +94,29 @@ model Category {
   @@unique([kind, slug])
   @@unique([kind, name])
   @@index([kind, isActive, sortOrder])
-  directUrl = env("DIRECT_URL")
+}
 
 model SubApp {
-  id          String           @id @default(uuid())
+  id          String   @id @default(uuid())
   name        String
-  slug        String           @unique
+  slug        String   @unique
   tagline     String
   description String
   externalUrl String
   imagePath   String?
-  status      String           @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
+  status      String   @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
   publishedAt DateTime?
   archivedAt  DateTime?
   createdById String?
   updatedById String?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   categories  SubAppCategory[]
 
   @@index([status, publishedAt])
   @@index([status, name])
-  directUrl = env("DIRECT_URL")
+}
 
 model SubAppCategory {
   subAppId   String
@@ -128,12 +127,12 @@ model SubAppCategory {
 
   @@id([subAppId, categoryId])
   @@index([categoryId])
-  directUrl = env("DIRECT_URL")
+}
 
 model CreativeProfile {
-  id              String                    @id @default(uuid())
+  id              String @id @default(uuid())
   name            String
-  slug            String                    @unique
+  slug            String @unique
   summary         String
   description     String
   city            String
@@ -142,13 +141,13 @@ model CreativeProfile {
   websiteUrl      String?
   instagramHandle String?
   whatsappNumber  String?
-  status          String                    @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
+  status          String @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
   publishedAt     DateTime?
   archivedAt      DateTime?
   createdById     String?
   updatedById     String?
-  createdAt       DateTime                  @default(now())
-  updatedAt       DateTime                  @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   categories      CreativeProfileCategory[]
   owner           CreativeProfileOwner?
@@ -158,7 +157,7 @@ model CreativeProfile {
   @@index([status, publishedAt])
   @@index([status, city])
   @@index([status, district])
-  directUrl = env("DIRECT_URL")
+}
 
 model CreativeProfileCategory {
   creativeProfileId String
@@ -169,33 +168,32 @@ model CreativeProfileCategory {
 
   @@id([creativeProfileId, categoryId])
   @@index([categoryId])
-  directUrl = env("DIRECT_URL")
+}
 
-// K-01: Explicit Owner Link between User and CreativeProfile
 model CreativeProfileOwner {
-  id                String          @id @default(uuid())
-  creativeProfileId String          @unique
-  userId            String          @unique
+  id                String @id @default(uuid())
+  creativeProfileId String @unique
+  userId            String @unique
   assignedById      String?
-  createdAt         DateTime        @default(now())
+  createdAt         DateTime @default(now())
 
   creativeProfile   CreativeProfile @relation(fields: [creativeProfileId], references: [id], onDelete: Cascade)
   user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  directUrl = env("DIRECT_URL")
+  assignedBy        User?           @relation("OwnerAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+}
 
-// Showcase Works model
 model CreativeWork {
-  id                String          @id @default(uuid())
+  id                String @id @default(uuid())
   creativeProfileId String
   title             String
-  slug              String          @unique
+  slug              String @unique
   description       String
-  imagePaths        String          @default("[]") // JSON array string of up to 5 image paths
+  imagePaths        String @default("[]") // JSON array string of up to 5 image paths
   technique         String?
   motif             String?
   year              Int?
   categoryId        String?
-  status            String          @default("DRAFT") // DRAFT, PENDING_REVIEW, NEEDS_REVISION, REJECTED, PUBLISHED, ARCHIVED
+  status            String @default("DRAFT") // DRAFT, PENDING_REVIEW, NEEDS_REVISION, REJECTED, PUBLISHED, ARCHIVED
   reviewNote        String?
   submittedAt       DateTime?
   reviewedAt        DateTime?
@@ -204,8 +202,8 @@ model CreativeWork {
   archivedAt        DateTime?
   createdById       String?
   updatedById       String?
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   creativeProfile   CreativeProfile @relation(fields: [creativeProfileId], references: [id], onDelete: Restrict)
   category          Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
@@ -214,25 +212,24 @@ model CreativeWork {
   @@index([status, publishedAt])
   @@index([creativeProfileId, status])
   @@index([categoryId])
-  directUrl = env("DIRECT_URL")
+}
 
-// Pasar Creative Products model
 model CreativeProduct {
-  id                String          @id @default(uuid())
+  id                String @id @default(uuid())
   creativeProfileId String
   workId            String?
   title             String
-  slug              String          @unique
+  slug              String @unique
   description       String
-  imagePaths        String          @default("[]") // JSON array string of up to 5 image paths
+  imagePaths        String @default("[]")
   productTypeId     String
   material          String?
   dimensions        String?
   priceMin          Int?
   priceMax          Int?
-  priceUnit         String?
-  availability      String          @default("AVAILABLE") // AVAILABLE, MADE_TO_ORDER, UNAVAILABLE
-  status            String          @default("DRAFT") // DRAFT, PENDING_REVIEW, NEEDS_REVISION, REJECTED, PUBLISHED, ARCHIVED
+  priceUnit         String? @db.VarChar(30)
+  availability      String @default("AVAILABLE") // AVAILABLE, MADE_TO_ORDER, UNAVAILABLE
+  status            String @default("DRAFT") // DRAFT, PENDING_REVIEW, NEEDS_REVISION, REJECTED, PUBLISHED, ARCHIVED
   reviewNote        String?
   submittedAt       DateTime?
   reviewedAt        DateTime?
@@ -241,8 +238,8 @@ model CreativeProduct {
   archivedAt        DateTime?
   createdById       String?
   updatedById       String?
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   creativeProfile   CreativeProfile @relation(fields: [creativeProfileId], references: [id], onDelete: Restrict)
   productType       Category        @relation(fields: [productTypeId], references: [id], onDelete: Restrict)
@@ -251,4 +248,4 @@ model CreativeProduct {
   @@index([status, publishedAt])
   @@index([creativeProfileId, status])
   @@index([productTypeId])
-  directUrl = env("DIRECT_URL")
+}
